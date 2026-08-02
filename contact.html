@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contact — I Think Services | Book a Free Automation Audit</title>
+<meta name="description" content="Tell us the task you want gone. Book a free 30-minute automation audit with I Think Services." />
+<meta name="theme-color" content="#0b0f19" />
+<link rel="canonical" href="https://www.ithinkservices.com/contact.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Contact — I Think Services" />
+<meta property="og:description" content="Book a free 30-minute automation audit." />
+<meta property="og:url" content="https://www.ithinkservices.com/contact.html" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236d5efc'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3Ei%3C/text%3E%3C/svg%3E" />
+<style>
+:root{
+  --bg:#0b0f19;--bg2:#111726;--card:#151c2e;--line:#233049;
+  --txt:#e8ecf5;--muted:#98a2b8;--brand:#6d5efc;--brand2:#22d3ee;
+  --accent:#a78bfa;--ok:#34d399;--radius:16px;--max:1140px;
+  --grad:linear-gradient(120deg,#6d5efc 0%,#22d3ee 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 22px}
+.btn{display:inline-block;padding:13px 24px;border-radius:12px;font-weight:600;font-size:15px;cursor:pointer;border:1px solid transparent;transition:transform .15s ease}
+.btn:hover{transform:translateY(-2px)}
+.btn-primary{background:var(--grad);color:#08111f;box-shadow:0 8px 30px rgba(109,94,252,.35)}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--txt)}
+.btn-ghost:hover{border-color:var(--brand)}
+header.nav{position:sticky;top:0;z-index:50;background:rgba(11,15,25,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;height:66px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:var(--grad);display:grid;place-items:center;color:#08111f;font-weight:900}
+.brand span.accent{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.links{display:flex;align-items:center;gap:28px}
+.links a{color:var(--muted);font-size:15px;font-weight:500;transition:color .15s}
+.links a:hover,.links a.active{color:var(--txt)}
+.menu-btn{display:none;background:none;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer}
+.page-head{padding:78px 0 12px;text-align:center;position:relative;overflow:hidden}
+.page-head::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 260px at 50% 0%,rgba(109,94,252,.22),transparent 60%);pointer-events:none}
+.eyebrow{color:var(--brand2);font-weight:700;letter-spacing:2px;text-transform:uppercase;font-size:13px}
+h1{font-size:clamp(32px,5.5vw,52px);font-weight:800;letter-spacing:-1px;margin:10px 0 14px}
+h1 .accent{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{max-width:620px;margin:0 auto;color:var(--muted);font-size:clamp(16px,2.3vw,19px)}
+section{padding:40px 0 60px}
+.layout{display:grid;grid-template-columns:1.2fr .9fr;gap:34px;align-items:start}
+.formcard{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:32px}
+.field{margin-bottom:18px}
+label{display:block;font-size:14px;font-weight:600;margin-bottom:7px}
+input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;color:var(--txt);padding:13px 14px;font-size:15px;font-family:inherit;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand)}
+textarea{resize:vertical;min-height:120px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.msg{display:none;margin-top:16px;padding:13px 16px;border-radius:11px;font-size:15px;border:1px solid var(--line)}
+.msg.ok{display:block;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.4);color:#a7f3d0}
+.msg.err{display:block;background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.4);color:#fecaca}
+.info h3{font-size:18px;margin-bottom:14px}
+.info-item{display:flex;gap:13px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.info-item .ico{font-size:22px}
+.info-item .lbl{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.info-item .val{font-size:16px;font-weight:600}
+footer{border-top:1px solid var(--line);padding:52px 0 34px;color:var(--muted)}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:32px;margin-bottom:34px}
+footer h4{color:var(--txt);font-size:14px;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+footer a{display:block;color:var(--muted);font-size:15px;margin-bottom:9px}
+footer a:hover{color:var(--txt)}
+.foot-bottom{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:22px;font-size:14px;flex-wrap:wrap;gap:10px}
+@media(max-width:860px){.links{display:none}.menu-btn{display:block}.foot-grid{grid-template-columns:1fr}.layout{grid-template-columns:1fr}}
+@media(max-width:520px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/"><span class="logo">i</span> I Think <span class="accent">Services</span></a>
+    <nav class="links" id="links">
+      <a href="/">Home</a>
+      <a href="/services.html">Services</a>
+      <a href="/about.html">About</a>
+      <a href="/contact.html" class="active">Contact</a>
+      <a class="btn btn-primary" href="/contact.html">Book a call</a>
+    </nav>
+    <button class="menu-btn" onclick="document.getElementById('links').style.display=(document.getElementById('links').style.display==='flex'?'none':'flex')">☰</button>
+  </div>
+</header>
+
+<div class="page-head">
+  <div class="wrap">
+    <div class="eyebrow">Contact</div>
+    <h1>Tell us the task <span class="accent">you want gone</span></h1>
+    <p class="lead">Book a free 30-minute automation audit. Describe the workflow that's eating your time and we'll show you what automating it looks like.</p>
+  </div>
+</div>
+
+<section>
+  <div class="wrap layout">
+    <div class="formcard">
+      <form id="contactForm" novalidate>
+        <div class="row">
+          <div class="field"><label for="name">Name</label><input id="name" name="name" type="text" placeholder="Jane Doe" required /></div>
+          <div class="field"><label for="company">Company</label><input id="company" name="company" type="text" placeholder="Acme Inc." /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" placeholder="jane@acme.com" required /></div>
+          <div class="field"><label for="budget">Budget</label>
+            <select id="budget" name="budget">
+              <option value="">Not sure yet</option>
+              <option>Under $2k</option>
+              <option>$2k – $10k</option>
+              <option>$10k – $50k</option>
+              <option>$50k+</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label for="message">What would you like to automate?</label><textarea id="message" name="message" placeholder="e.g. Every new order in Shopify should create an invoice, notify the team in Slack, and update our spreadsheet automatically." required></textarea></div>
+        <button class="btn btn-primary" type="submit" style="width:100%">Send &amp; book my audit</button>
+        <div class="msg" id="formMsg"></div>
+        <p style="color:var(--muted);font-size:13px;margin-top:14px;text-align:center">Your email client opens with the message ready to send. Prefer email? Write us directly at <a href="mailto:hello@ithinkservices.com" style="color:var(--brand2)">hello@ithinkservices.com</a>.</p>
+      </form>
+    </div>
+
+    <div class="info">
+      <h3>Other ways to reach us</h3>
+      <div class="info-item"><div class="ico">✉️</div><div><div class="lbl">Email</div><div class="val"><a href="mailto:hello@ithinkservices.com">hello@ithinkservices.com</a></div></div></div>
+      <div class="info-item"><div class="ico">⏱️</div><div><div class="lbl">Response time</div><div class="val">Within 1 business day</div></div></div>
+      <div class="info-item"><div class="ico">🌍</div><div><div class="lbl">Where we work</div><div class="val">Remote-first, worldwide</div></div></div>
+      <div class="info-item"><div class="ico">🎁</div><div><div class="lbl">The audit</div><div class="val">Free · 30 min · no pitch</div></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="/" style="margin-bottom:14px"><span class="logo">i</span> I Think <span class="accent">Services</span></a>
+        <p style="max-width:320px">AI automation and intelligent workflows for teams that would rather build than repeat themselves.</p>
+      </div>
+      <div><h4>Company</h4><a href="/about.html">About</a><a href="/services.html">Services</a><a href="/contact.html">Contact</a></div>
+      <div><h4>Get in touch</h4><a href="mailto:hello@ithinkservices.com">hello@ithinkservices.com</a><a href="/contact.html">Book a call</a></div>
+    </div>
+    <div class="foot-bottom"><span>© <span id="yr"></span> I Think Services. All rights reserved.</span><span>Built for automation.</span></div>
+  </div>
+</footer>
+
+<script>
+document.getElementById('yr').textContent=new Date().getFullYear();
+(function(){
+  var form=document.getElementById('contactForm'),msg=document.getElementById('formMsg');
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var name=form.name.value.trim(),email=form.email.value.trim(),
+        company=form.company.value.trim(),budget=form.budget.value,
+        message=form.message.value.trim();
+    if(!name||!email||!message){msg.className='msg err';msg.textContent='Please fill in your name, email, and what you’d like to automate.';return;}
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.className='msg err';msg.textContent='That email address doesn’t look right — mind checking it?';return;}
+    var subject='Automation audit request — '+name+(company?' ('+company+')':''),
+        body='Name: '+name+'\nEmail: '+email+'\nCompany: '+(company||'—')+'\nBudget: '+(budget||'Not sure yet')+'\n\nWhat to automate:\n'+message;
+    window.location.href='mailto:hello@ithinkservices.com?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    msg.className='msg ok';msg.textContent='Opening your email app — just hit send and we’ll be in touch within a business day.';
+    form.reset();
+  });
+})();
+</script>
+</body>
+</html>
