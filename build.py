@@ -17,7 +17,7 @@ import sys
 from datetime import date
 
 # ── Edit this to your live domain (no trailing slash) ────────────────
-SITE_URL = "https://www.ithinkservices.com"
+SITE_URL = "https://www.ithinkservices.net"
 
 # Pages to include in the sitemap: (path, change frequency, priority)
 PAGES = [

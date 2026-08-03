@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.ithinkservices.com/sitemap.xml
+Sitemap: https://www.ithinkservices.net/sitemap.xml

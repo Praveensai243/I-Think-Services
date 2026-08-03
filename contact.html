@@ -6,11 +6,11 @@
 <title>Contact — I Think Services | Book a Free Automation Audit</title>
 <meta name="description" content="Tell us the task you want gone. Book a free 30-minute automation audit with I Think Services." />
 <meta name="theme-color" content="#0b0f19" />
-<link rel="canonical" href="https://www.ithinkservices.com/contact.html" />
+<link rel="canonical" href="https://www.ithinkservices.net/contact.html" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Contact — I Think Services" />
 <meta property="og:description" content="Book a free 30-minute automation audit." />
-<meta property="og:url" content="https://www.ithinkservices.com/contact.html" />
+<meta property="og:url" content="https://www.ithinkservices.net/contact.html" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236d5efc'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3Ei%3C/text%3E%3C/svg%3E" />
 <style>
 :root{
@@ -117,13 +117,13 @@ footer a:hover{color:var(--txt)}
         <div class="field"><label for="message">What would you like to automate?</label><textarea id="message" name="message" placeholder="e.g. Every new order in Shopify should create an invoice, notify the team in Slack, and update our spreadsheet automatically." required></textarea></div>
         <button class="btn btn-primary" type="submit" style="width:100%">Send &amp; book my audit</button>
         <div class="msg" id="formMsg"></div>
-        <p style="color:var(--muted);font-size:13px;margin-top:14px;text-align:center">Your email client opens with the message ready to send. Prefer email? Write us directly at <a href="mailto:hello@ithinkservices.com" style="color:var(--brand2)">hello@ithinkservices.com</a>.</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:14px;text-align:center">Your email client opens with the message ready to send. Prefer email? Write us directly at <a href="mailto:hello@ithinkservices.net" style="color:var(--brand2)">hello@ithinkservices.net</a>.</p>
       </form>
     </div>
 
     <div class="info">
       <h3>Other ways to reach us</h3>
-      <div class="info-item"><div class="ico">✉️</div><div><div class="lbl">Email</div><div class="val"><a href="mailto:hello@ithinkservices.com">hello@ithinkservices.com</a></div></div></div>
+      <div class="info-item"><div class="ico">✉️</div><div><div class="lbl">Email</div><div class="val"><a href="mailto:hello@ithinkservices.net">hello@ithinkservices.net</a></div></div></div>
       <div class="info-item"><div class="ico">⏱️</div><div><div class="lbl">Response time</div><div class="val">Within 1 business day</div></div></div>
       <div class="info-item"><div class="ico">🌍</div><div><div class="lbl">Where we work</div><div class="val">Remote-first, worldwide</div></div></div>
       <div class="info-item"><div class="ico">🎁</div><div><div class="lbl">The audit</div><div class="val">Free · 30 min · no pitch</div></div></div>
@@ -139,7 +139,7 @@ footer a:hover{color:var(--txt)}
         <p style="max-width:320px">AI automation and intelligent workflows for teams that would rather build than repeat themselves.</p>
       </div>
       <div><h4>Company</h4><a href="/about.html">About</a><a href="/services.html">Services</a><a href="/contact.html">Contact</a></div>
-      <div><h4>Get in touch</h4><a href="mailto:hello@ithinkservices.com">hello@ithinkservices.com</a><a href="/contact.html">Book a call</a></div>
+      <div><h4>Get in touch</h4><a href="mailto:hello@ithinkservices.net">hello@ithinkservices.net</a><a href="/contact.html">Book a call</a></div>
     </div>
     <div class="foot-bottom"><span>© <span id="yr"></span> I Think Services. All rights reserved.</span><span>Built for automation.</span></div>
   </div>
@@ -158,7 +158,7 @@ document.getElementById('yr').textContent=new Date().getFullYear();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.className='msg err';msg.textContent='That email address doesn’t look right — mind checking it?';return;}
     var subject='Automation audit request — '+name+(company?' ('+company+')':''),
         body='Name: '+name+'\nEmail: '+email+'\nCompany: '+(company||'—')+'\nBudget: '+(budget||'Not sure yet')+'\n\nWhat to automate:\n'+message;
-    window.location.href='mailto:hello@ithinkservices.com?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    window.location.href='mailto:hello@ithinkservices.net?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
     msg.className='msg ok';msg.textContent='Opening your email app — just hit send and we’ll be in touch within a business day.';
     form.reset();
   });
