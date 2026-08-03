@@ -352,7 +352,7 @@ footer{border-top:1px solid var(--line);padding:64px 0 40px;margin-top:50px;posi
 <section style="padding-top:20px"><div class="wrap"><div class="contact-grid">
   <div class="reveal">
     <!-- Web3Forms: get a free access key at https://web3forms.com and paste it below -->
-    <form action="https://api.web3forms.com/submit" method="POST">
+    <form id="contact-form" action="https://api.web3forms.com/submit" method="POST">
       <input type="hidden" name="access_key" value="YOUR-WEB3FORMS-ACCESS-KEY">
       <input type="hidden" name="subject" value="New enquiry from ithinkservices.net">
       <input type="checkbox" name="botcheck" style="display:none">
@@ -363,6 +363,7 @@ footer{border-top:1px solid var(--line);padding:64px 0 40px;margin-top:50px;posi
         <select id="interest" name="interest"><option>AI automation</option><option>IT &amp; talent services</option><option>Both</option><option>Something else</option></select></div>
       <div class="field"><label for="msg">What can we help with?</label><textarea id="msg" name="message" required></textarea></div>
       <button class="btn btn-primary" type="submit">Send message <span class="arw">↗</span></button>
+      <div id="form-status" role="status" aria-live="polite" style="display:none;margin-top:14px;font-family:var(--f-mono);font-size:.8rem;letter-spacing:.03em"></div>
       <p class="note">Form delivery is powered by Web3Forms (free). Add your access key to go live — see the setup notes.</p>
     </form>
   </div>
@@ -461,5 +462,22 @@ if(boot){
       el.textContent=Math.round(to*(1-Math.pow(1-p,3)))+suf;if(p<1)requestAnimationFrame(f)})};
   const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){run(e.target);o.unobserve(e.target)}}),{threshold:.5});
   ms.forEach(m=>o.observe(m));
+})();
+// contact form — AJAX submit with inline status (native action is the no-JS fallback)
+(function(){
+  const f=document.getElementById('contact-form');if(!f)return;
+  const s=document.getElementById('form-status'),btn=f.querySelector('button[type="submit"]');
+  const label=btn?btn.innerHTML:'Send message';
+  const show=(msg,color)=>{if(!s)return;s.style.display='block';s.style.color=color;s.textContent=msg};
+  f.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(btn){btn.disabled=true;btn.innerHTML='Sending…'}
+    show('Transmitting your message…','var(--muted)');
+    fetch('https://api.web3forms.com/submit',{method:'POST',headers:{Accept:'application/json'},body:new FormData(f)})
+      .then(r=>r.json())
+      .then(d=>{if(d.success){show("Thanks — your message is in. We'll reply within one business day.",'var(--flow)');f.reset()}else{throw new Error(d.message||'failed')}})
+      .catch(()=>show("Couldn't send just now. Please email info@ithinkservices.net.",'var(--manual)'))
+      .finally(()=>{if(btn){btn.disabled=false;btn.innerHTML=label}});
+  });
 })();
 </script></body></html>
