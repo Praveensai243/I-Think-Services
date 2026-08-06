@@ -1,0 +1,28 @@
+{
+  "name": "Luxe Hair Studio",
+  "industry": "hair salon",
+  "timezone": "America/New_York",
+  "phoneForHumans": "+1 (704) 555-0142",
+  "greeting": "Thanks for calling Luxe Hair Studio, this is Mia. Would you like to book an appointment?",
+  "agentName": "Mia",
+  "hours": {
+    "mon": null, "tue": ["10:00", "19:00"], "wed": ["10:00", "19:00"], "thu": ["10:00", "20:00"],
+    "fri": ["09:00", "19:00"], "sat": ["09:00", "17:00"], "sun": null
+  },
+  "slotMinutes": 30,
+  "services": [
+    { "id": "cut", "name": "Haircut & style", "minutes": 45 },
+    { "id": "color", "name": "Color / highlights", "minutes": 120 },
+    { "id": "blowout", "name": "Blowout", "minutes": 30 },
+    { "id": "treatment", "name": "Keratin treatment", "minutes": 90 }
+  ],
+  "faq": [
+    { "q": "walk-ins", "a": "We take walk-ins when a stylist is free, but booking ahead is the surest way to get your time." },
+    { "q": "price", "a": "Haircuts start at $45, color from $110. Your stylist will confirm exact pricing at the chair." },
+    { "q": "parking", "a": "There's a free lot behind the building and street parking out front." },
+    { "q": "cancellation", "a": "Just give us 24 hours' notice for a change or cancellation and there's no fee." },
+    { "q": "address", "a": "We're at 88 South Boulevard, Charlotte, NC 28203." }
+  ],
+  "escalation": { "toHumanWhen": ["a complaint about a previous service", "a request for a specific stylist who is unavailable", "the caller is upset or asks for the owner"] },
+  "sampleQuestions": ["Book me a haircut", "How much is color?", "Do you take walk-ins?", "Can I move my Friday appointment?"]
+}

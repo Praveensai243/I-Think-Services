@@ -17,12 +17,20 @@ export interface BusinessConfig {
   services: { id: string; name: string; minutes: number }[];
   faq: { q: string; a: string }[];
   escalation: { toHumanWhen: string[] };
+  sampleQuestions?: string[];
 }
 
-/** The single business the agent is trained on. Swap this file per client. */
-export const business: BusinessConfig = JSON.parse(
-  readFileSync(resolve(__dirname, "../business.config.json"), "utf8"),
+/**
+ * The business this agent instance is trained on. Point at a different client
+ * with BUSINESS_CONFIG=examples/salon.json (path relative to the agent/ folder),
+ * so one deploy can serve many clients — or just edit business.config.json.
+ */
+const configPath = resolve(
+  __dirname,
+  "..",
+  process.env.BUSINESS_CONFIG ?? "business.config.json",
 );
+export const business: BusinessConfig = JSON.parse(readFileSync(configPath, "utf8"));
 
 export const env = {
   port: Number(process.env.PORT ?? 8787),

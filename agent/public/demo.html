@@ -134,7 +134,9 @@ async function loadConfig(){
     cfg = await (await fetch("/api/config")).json();
     $("#who").textContent = cfg.name + " · Receptionist";
     $("#flag").textContent = cfg.brain ? "" : "Demo mode: add ANTHROPIC_API_KEY on the server to make the agent talk.";
-    const chips = ["I'd like to book a cleaning","What are your hours?","Do you take Delta Dental?","I need to reschedule"];
+    const chips = (cfg.sampleQuestions && cfg.sampleQuestions.length)
+      ? cfg.sampleQuestions
+      : ["What do you offer?","What are your hours?","Book me an appointment","I need to reschedule"];
     const box = $("#chips");
     chips.forEach(c=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=c;
       b.onclick=()=>send(c); box.appendChild(b); });

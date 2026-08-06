@@ -117,7 +117,29 @@ npm run typecheck  # tsc --noEmit
 npm test           # booking/availability/conflict tests
 ```
 
-## Make it your business
-Edit `business.config.json` (hours, services, FAQ, greeting). That's it — the prompt,
-the tools, the availability logic, and the Vapi config all read from it. To trial a
-second client, copy the folder and swap that one file.
+## Reselling to local businesses (this is the product)
+
+I Think Services is an agency — so this engine is built to run **one client per config
+file**. Everything (persona, tools, availability, FAQ, Vapi config, demo chips) reads
+from a single JSON file; you never touch code to onboard a client.
+
+- **Your own line** is the default `business.config.json` — "Ava" answers prospects,
+  explains what you do, and books a **free demo**. Point your own number at it and it
+  literally sells the service while demoing it.
+- **Client templates** live in `examples/` — ready-to-tweak configs for common local
+  verticals: `dental.json`, `salon.json`, `home-services.json`. Copy one, change the
+  details, done.
+
+Run a specific client with the `BUSINESS_CONFIG` env var (path relative to `agent/`):
+
+```bash
+BUSINESS_CONFIG=examples/salon.json npm start     # serve the salon
+```
+
+So one deployment can serve many clients (run an instance per client with its own
+`BUSINESS_CONFIG` + phone number), or you just edit `business.config.json` for a single
+business. To onboard a new client: copy an example, fill in their name, hours, services,
+FAQ, greeting, and the number to transfer humans to — that's the whole job.
+
+> Before going live on your own line, set `phoneForHumans` in `business.config.json`
+> to a real number (it's currently a placeholder).

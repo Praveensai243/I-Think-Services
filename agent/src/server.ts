@@ -29,6 +29,7 @@ export function createServer() {
       agentName: business.agentName,
       greeting: business.greeting,
       services: business.services.map((s) => s.name),
+      sampleQuestions: business.sampleQuestions ?? [],
       brain: hasBrain,
     });
   });

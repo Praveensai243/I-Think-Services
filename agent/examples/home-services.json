@@ -1,0 +1,28 @@
+{
+  "name": "Queen City Plumbing",
+  "industry": "plumbing & home services company",
+  "timezone": "America/New_York",
+  "phoneForHumans": "+1 (704) 555-0177",
+  "greeting": "Queen City Plumbing, this is Sam. Is this an emergency, or would you like to schedule a visit?",
+  "agentName": "Sam",
+  "hours": {
+    "mon": ["07:00", "18:00"], "tue": ["07:00", "18:00"], "wed": ["07:00", "18:00"],
+    "thu": ["07:00", "18:00"], "fri": ["07:00", "18:00"], "sat": ["08:00", "14:00"], "sun": null
+  },
+  "slotMinutes": 60,
+  "services": [
+    { "id": "diagnostic", "name": "Diagnostic / service call", "minutes": 60 },
+    { "id": "install", "name": "Fixture install", "minutes": 120 },
+    { "id": "drain", "name": "Drain cleaning", "minutes": 60 },
+    { "id": "estimate", "name": "Free estimate visit", "minutes": 30 }
+  ],
+  "faq": [
+    { "q": "emergency", "a": "For active leaks or no water, we offer same-day emergency service — I can get a technician out to you. For a burst pipe, please shut off your main water valve first." },
+    { "q": "service area", "a": "We cover Charlotte and the surrounding towns within about 25 miles." },
+    { "q": "pricing", "a": "A standard service call is $89 and is applied toward the repair. We give a firm quote before any work begins." },
+    { "q": "warranty", "a": "All our work is backed by a one-year workmanship warranty." },
+    { "q": "payment", "a": "We take all major cards, checks, and offer financing on larger jobs." }
+  ],
+  "escalation": { "toHumanWhen": ["a gas smell or safety hazard", "a dispute about a past invoice", "the caller is upset or asks for a supervisor"] },
+  "sampleQuestions": ["My water heater is leaking", "Can I get a free estimate?", "What's your service area?", "How much is a service call?"]
+}
