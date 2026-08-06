@@ -1,0 +1,39 @@
+{
+  "name": "Bright Smile Dental",
+  "industry": "dental clinic",
+  "timezone": "America/New_York",
+  "phoneForHumans": "+1 (704) 555-0100",
+  "greeting": "Thanks for calling Bright Smile Dental, this is Ava. How can I help you today?",
+  "agentName": "Ava",
+  "hours": {
+    "mon": ["09:00", "17:00"],
+    "tue": ["09:00", "17:00"],
+    "wed": ["09:00", "17:00"],
+    "thu": ["09:00", "17:00"],
+    "fri": ["09:00", "16:00"],
+    "sat": ["09:00", "13:00"],
+    "sun": null
+  },
+  "slotMinutes": 30,
+  "services": [
+    { "id": "cleaning", "name": "Cleaning & check-up", "minutes": 30 },
+    { "id": "new-patient", "name": "New patient exam", "minutes": 60 },
+    { "id": "whitening", "name": "Teeth whitening", "minutes": 45 },
+    { "id": "emergency", "name": "Emergency / tooth pain", "minutes": 30 }
+  ],
+  "faq": [
+    { "q": "parking", "a": "Yes — there's free patient parking right in front, plus a wheelchair-accessible entrance." },
+    { "q": "insurance", "a": "We're in-network with Delta Dental PPO, MetLife, and Cigna. Cleanings and check-ups are typically covered at 100%." },
+    { "q": "new patients", "a": "Absolutely, we're welcoming new patients. A first visit is a 60-minute new-patient exam." },
+    { "q": "address", "a": "We're at 120 Trade Street, Suite 200, Charlotte, NC 28202." },
+    { "q": "payment", "a": "We take all major cards, HSA/FSA cards, and offer CareCredit financing." }
+  ],
+  "escalation": {
+    "toHumanWhen": [
+      "the caller is upset or asks for a manager",
+      "a billing dispute or refund",
+      "a medical emergency beyond scheduling",
+      "anything you are not confident about"
+    ]
+  }
+}
