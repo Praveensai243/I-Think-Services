@@ -2,7 +2,7 @@
   "name": "I Think Services",
   "industry": "AI solutions agency for local businesses",
   "timezone": "America/New_York",
-  "phoneForHumans": "REPLACE_WITH_YOUR_REAL_NUMBER",
+  "phoneForHumans": "+1 (704) 387-9775",
   "greeting": "Thanks for calling I Think Services, this is Ava. Are you looking to add an AI receptionist or automate something in your business?",
   "agentName": "Ava",
   "hours": {
@@ -27,7 +27,7 @@
     { "q": "how fast", "a": "Most businesses are answering real calls within days. We train the agent on your info, connect your lines and calendar, test it, and go live." },
     { "q": "phone number", "a": "You keep your existing number — we route it to the AI, so nothing changes for your customers." },
     { "q": "location", "a": "We're based in Charlotte, North Carolina, and we work with businesses across the US." },
-    { "q": "contact", "a": "You can reach the team at info@ithinkservices.net, or I can book you a free demo right now." }
+    { "q": "contact", "a": "You can reach the team at contact@ithinkservices.net or 704-387-9775, or I can book you a free demo right now." }
   ],
   "escalation": {
     "toHumanWhen": [
