@@ -20,6 +20,7 @@ All animation is pure CSS + vanilla JavaScript — **zero libraries**.
 - `_headers` — Cloudflare Pages security headers
 - `robots.txt`, `sitemap.xml` — basic SEO
 - `build.py` — optional generator for `sitemap.xml` / `robots.txt` (keeps the live domain in sync)
+- `agent/` — the **AI receptionist backend** (Claude brain + booking tools) that powers a browser voice demo and a real phone number via Vapi. Runs keyless in demo mode; see [`agent/README.md`](agent/README.md).
 
 ---
 

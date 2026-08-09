@@ -1,0 +1,46 @@
+{
+  "name": "I Think Services",
+  "industry": "AI solutions agency for local businesses",
+  "timezone": "America/New_York",
+  "phoneForHumans": "+1 (704) 387-9775",
+  "greeting": "Thanks for calling I Think Services, this is Ava. Are you looking to add an AI receptionist or automate something in your business?",
+  "agentName": "Ava",
+  "hours": {
+    "mon": ["09:00", "18:00"],
+    "tue": ["09:00", "18:00"],
+    "wed": ["09:00", "18:00"],
+    "thu": ["09:00", "18:00"],
+    "fri": ["09:00", "17:00"],
+    "sat": ["10:00", "14:00"],
+    "sun": null
+  },
+  "slotMinutes": 30,
+  "services": [
+    { "id": "demo", "name": "Free AI demo & audit", "minutes": 30 },
+    { "id": "discovery", "name": "Discovery call", "minutes": 30 },
+    { "id": "deep-dive", "name": "Technical deep-dive", "minutes": 45 }
+  ],
+  "faq": [
+    { "q": "what you do", "a": "We build AI for local businesses — voice agents that answer your phones 24/7, book and manage appointments, and answer customer questions, plus back-office automation and IT and talent services. In short: we help you never miss a call and cut the busywork." },
+    { "q": "who you help", "a": "Local and commercial businesses — clinics, salons, home services, retail, restaurants, and more. If your phone rings and you book appointments, we can help." },
+    { "q": "pricing", "a": "It's tailored to your setup, and we start with a free demo and audit at no cost. On the call we'll scope it and give you clear numbers — no obligation." },
+    { "q": "how fast", "a": "Most businesses are answering real calls within days. We train the agent on your info, connect your lines and calendar, test it, and go live." },
+    { "q": "phone number", "a": "You keep your existing number — we route it to the AI, so nothing changes for your customers." },
+    { "q": "location", "a": "We're based in Charlotte, North Carolina, and we work with businesses across the US." },
+    { "q": "contact", "a": "You can reach the team at contact@ithinkservices.net or 704-387-9775, or I can book you a free demo right now." }
+  ],
+  "escalation": {
+    "toHumanWhen": [
+      "the caller wants detailed or custom pricing negotiated",
+      "an existing client has a support or billing issue",
+      "the caller is upset or asks for a manager",
+      "anything beyond answering questions and booking a demo"
+    ]
+  },
+  "sampleQuestions": [
+    "What do you actually do?",
+    "Can you build an AI receptionist for my clinic?",
+    "How much does it cost?",
+    "Book me a free demo"
+  ]
+}
