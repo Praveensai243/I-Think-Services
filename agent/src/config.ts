@@ -37,9 +37,21 @@ export const env = {
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "http://localhost:8787",
   anthropicKey: process.env.ANTHROPIC_API_KEY ?? "",
   model: process.env.MODEL ?? "claude-opus-5",
-  calendar: (process.env.CALENDAR ?? "mock").toLowerCase() as "mock" | "google",
+  calendar: (process.env.CALENDAR ?? "mock").toLowerCase() as "mock" | "google" | "calcom",
   vapiSecret: process.env.VAPI_SECRET ?? "",
   elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID ?? "",
+  adminToken: process.env.ADMIN_TOKEN ?? "",
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    priceStarter: process.env.STRIPE_PRICE_STARTER ?? "",
+    pricePro: process.env.STRIPE_PRICE_PRO ?? "",
+    portalReturnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? "",
+  },
+  calcom: {
+    apiKey: process.env.CALCOM_API_KEY ?? "",
+    eventTypeId: process.env.CALCOM_EVENT_TYPE_ID ?? "",
+  },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID ?? "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
@@ -56,3 +68,9 @@ export const hasBrain = Boolean(env.anthropicKey);
 export const usingGoogle =
   env.calendar === "google" &&
   Boolean(env.google.clientId && env.google.clientSecret && env.google.refreshToken);
+
+/** True when Cal.com is configured. */
+export const usingCalcom = env.calendar === "calcom" && Boolean(env.calcom.apiKey);
+
+/** True when Stripe billing is configured. */
+export const usingStripe = Boolean(env.stripe.secretKey);

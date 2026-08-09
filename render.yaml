@@ -1,0 +1,49 @@
+# One-click deploy of the AI receptionist backend on Render.
+# In Render: New → Blueprint → connect this repo. Render reads this file.
+# Then set the secret values (marked sync:false) in the dashboard.
+services:
+  - type: web
+    name: ithink-ai-agent
+    runtime: node
+    rootDir: agent
+    plan: starter            # use "starter" (always-on) for phone webhooks; "free" is fine for the browser demo but sleeps when idle
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY      # required to make it talk — from console.anthropic.com
+        sync: false
+      - key: MODEL
+        value: claude-opus-5        # or claude-haiku-4-5 for lowest phone latency
+      - key: CALENDAR
+        value: mock                 # mock | google | calcom
+      - key: ADMIN_TOKEN            # protects /admin — pick any strong string
+        sync: false
+      - key: PUBLIC_BASE_URL        # set to this service's public URL after first deploy
+        sync: false
+      # Optional integrations — fill in when you add them:
+      - key: VAPI_SECRET
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_CALENDAR_ID
+        value: primary
+      - key: CALCOM_API_KEY
+        sync: false
+      - key: CALCOM_EVENT_TYPE_ID
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_STARTER
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false

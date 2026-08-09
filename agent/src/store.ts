@@ -26,9 +26,14 @@ export function resetSession(id: string): void {
 // Simple durable-ish logs the front desk would want to see.
 export interface MessageNote { name: string; phone?: string; message: string; at: string; sessionId: string }
 export interface Handoff { reason: string; at: string; sessionId: string }
+export interface BookingRecord {
+  id: string; name: string; phone: string; service: string;
+  startISO: string; at: string; source: "web" | "phone"; action: "booked" | "rescheduled" | "cancelled";
+}
 
 export const messageLog: MessageNote[] = [];
 export const handoffLog: Handoff[] = [];
+export const bookingLog: BookingRecord[] = [];
 
 // prune old sessions occasionally so memory doesn't grow unbounded
 setInterval(() => {
