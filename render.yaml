@@ -15,7 +15,7 @@ services:
       - key: ANTHROPIC_API_KEY      # required to make it talk — from console.anthropic.com
         sync: false
       - key: MODEL
-        value: claude-opus-5        # or claude-haiku-4-5 for lowest phone latency
+        value: claude-haiku-4-5      # fast + natural for voice; use claude-opus-5 for maximum smarts
       - key: CALENDAR
         value: mock                 # mock | google | calcom
       - key: ADMIN_TOKEN            # protects /admin — pick any strong string
