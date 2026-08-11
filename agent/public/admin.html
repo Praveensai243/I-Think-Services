@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — AI Receptionist | I Think Services</title>
+<style>
+  :root{--bg:#05070E;--surface:#0C1122;--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);
+    --text:#EDF1FF;--muted:#9AA6C9;--dim:#616E93;--brand:#5B84FF;--flow:#22E8B6;--gold:#FFC46B;--live:#FF5D73;
+    --f:"Inter",system-ui,sans-serif;--fm:"JetBrains Mono",ui-monospace,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--f);min-height:100vh;
+    background-image:radial-gradient(50vw 40vw at 90% -10%,rgba(91,132,255,.12),transparent 60%)}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-family:var(--f);font-size:1.4rem;margin:0}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:.9rem;margin:2px 0 22px}
+  .tokbar{display:flex;gap:8px;margin-bottom:20px}
+  .tokbar input{flex:1;max-width:320px;background:#080B16;border:1px solid var(--line2);border-radius:10px;
+    padding:9px 12px;color:var(--text);font-family:var(--fm);font-size:.85rem}
+  .btn{background:linear-gradient(135deg,var(--brand),var(--flow));color:#04121d;border:none;border-radius:10px;
+    padding:9px 16px;font-weight:600;cursor:pointer;font-family:var(--f)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
+  .stat{background:linear-gradient(180deg,var(--surface),#080B16);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+  .stat b{display:block;font-size:1.9rem;font-family:var(--f);letter-spacing:-.02em}
+  .stat span{color:var(--muted);font-size:.78rem;font-family:var(--fm);letter-spacing:.04em;text-transform:uppercase}
+  .stat.flow b{color:var(--flow)} .stat.gold b{color:var(--gold)} .stat.brand b{color:var(--brand)}
+  h2{font-size:1rem;margin:24px 0 10px;color:var(--muted);font-weight:600;font-family:var(--fm);
+    letter-spacing:.06em;text-transform:uppercase}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-family:var(--fm);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+  td{color:var(--text)} .pill{font-family:var(--fm);font-size:.66rem;padding:2px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--muted)}
+  .pill.booked{color:var(--flow);border-color:rgba(34,232,182,.4)} .pill.cancelled{color:var(--live);border-color:rgba(255,93,115,.4)}
+  .pill.rescheduled{color:var(--gold);border-color:rgba(255,196,107,.4)}
+  .empty{color:var(--dim);font-size:.88rem;padding:14px 0}
+  .card{background:linear-gradient(180deg,var(--surface),#080B16);border:1px solid var(--line);border-radius:16px;padding:6px 16px 14px;margin-bottom:8px}
+  .err{color:var(--live);font-family:var(--fm);font-size:.85rem;margin:10px 0}
+</style></head>
+<body><div class="wrap">
+  <div class="top"><h1 id="biz">AI Receptionist — Admin</h1><button class="btn" onclick="load()">Refresh</button></div>
+  <p class="sub">Bookings, messages, transfers and usage the agent captured this month.</p>
+  <div class="tokbar">
+    <input id="tok" type="password" placeholder="Admin token (if the server sets one)">
+    <button class="btn" onclick="saveTok()">Save</button>
+  </div>
+  <div id="err"></div>
+
+  <div class="grid" id="stats"></div>
+
+  <h2>Recent bookings</h2>
+  <div class="card"><table id="bk"><thead><tr><th>When booked</th><th>Customer</th><th>Service</th><th>Appointment</th><th>Via</th><th></th></tr></thead><tbody></tbody></table><div class="empty" id="bk-empty" hidden>No bookings yet.</div></div>
+
+  <h2>Messages taken</h2>
+  <div class="card"><table id="ms"><thead><tr><th>When</th><th>Name</th><th>Phone</th><th>Message</th></tr></thead><tbody></tbody></table><div class="empty" id="ms-empty" hidden>No messages yet.</div></div>
+
+  <h2>Transfers to a human</h2>
+  <div class="card"><table id="ho"><thead><tr><th>When</th><th>Reason</th></tr></thead><tbody></tbody></table><div class="empty" id="ho-empty" hidden>No transfers yet.</div></div>
+</div>
+<script>
+const $ = (s)=>document.querySelector(s);
+let token = localStorage.getItem("adminToken") || "";
+$("#tok").value = token;
+function saveTok(){ token = $("#tok").value.trim(); localStorage.setItem("adminToken", token); load(); }
+function fmt(iso){ if(!iso) return "—"; const d=new Date(iso); return isNaN(d.getTime())?iso:d.toLocaleString(); }
+function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
+
+function fillTable(id, rows, rowHtml){
+  document.querySelector("#"+id+" tbody").innerHTML = (rows||[]).map(r=>`<tr>${rowHtml(r)}</tr>`).join("");
+  document.querySelector("#"+id+"-empty").hidden = (rows||[]).length > 0;
+}
+
+async function load(){
+  $("#err").innerHTML="";
+  try{
+    const r = await fetch("/api/admin/data", { headers: token ? {"x-admin-token": token} : {} });
+    if(r.status===401){ $("#err").innerHTML='<div class="err">Unauthorized — enter the admin token above.</div>'; return; }
+    const d = await r.json();
+    const u = d.usage.current;
+    $("#biz").textContent = d.usage.business + " — Admin";
+    $("#stats").innerHTML = [
+      ["flow", u.bookings, "Bookings"],
+      ["gold", u.phoneMinutes, "Voice minutes"],
+      ["brand", u.phoneCalls, "Phone calls"],
+      ["", u.webSessions, "Web chats"],
+      ["", u.reschedules + u.cancellations, "Resched/Cancel"],
+      ["", u.messages, "Messages"],
+      ["", u.transfers, "Transfers"],
+    ].map(([c,v,l])=>`<div class="stat ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
+
+    fillTable("bk", d.bookings, (b)=>`<td>${fmt(b.at)}</td><td>${esc(b.name)||"—"}</td><td>${esc(b.service)||"—"}</td><td>${b.startISO?fmt(b.startISO):"—"}</td><td>${esc(b.source)}</td><td><span class="pill ${esc(b.action)}">${esc(b.action)}</span></td>`);
+    fillTable("ms", d.messages, (m)=>`<td>${fmt(m.at)}</td><td>${esc(m.name)}</td><td>${esc(m.phone)||"—"}</td><td>${esc(m.message)}</td>`);
+    fillTable("ho", d.handoffs, (h)=>`<td>${fmt(h.at)}</td><td>${esc(h.reason)||"—"}</td>`);
+  }catch(e){ $("#err").innerHTML='<div class="err">Could not load — is the server running?</div>'; }
+}
+load();
+</script>
+</body></html>

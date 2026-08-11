@@ -63,6 +63,10 @@ Set `CALENDAR=google` and fill the Google vars in `.env`:
 
 The agent now reads live availability and writes real events — no double-booking.
 
+**Prefer Cal.com?** Set `CALENDAR=calcom`, `CALCOM_API_KEY` (Settings → Developer → API
+keys), and `CALCOM_EVENT_TYPE_ID` (the event type callers book). Availability still comes
+from the client's business hours; bookings and cancellations go through Cal.com.
+
 ---
 
 ## 4. Put it on a real phone number — Vapi + Twilio + ElevenLabs
@@ -99,8 +103,13 @@ minute**, versus a receptionist you can't scale to hundreds of simultaneous call
 | `src/tools.ts` | The tools the agent can call: `check_availability`, `book/reschedule/cancel_appointment`, `answer_faq`, `take_message`, `transfer_to_human`. |
 | `src/calendar.ts` | Booking backend — Google Calendar or the keyless mock, with real availability + conflict checks. |
 | `src/agent.ts` | The Claude tool-use loop that turns speech into actions. |
-| `src/server.ts` | HTTP: web voice endpoint, Vapi webhook, assistant-config generator, static demo. |
+| `src/server.ts` | HTTP: web voice endpoint, Vapi webhook, assistant-config generator, admin, billing, static. |
+| `src/usage.ts` | Per-month usage counters (bookings, phone minutes, calls) for billing. |
+| `src/billing.ts` | Stripe checkout / portal / webhook (keyless-safe). |
 | `public/demo.html` | The browser "talk to our receptionist" widget (Web Speech in, natural voice out). |
+| `public/admin.html` | The admin dashboard. |
+| `scripts/new-client.ts` | `npm run new-client` — scaffold a client config from a short Q&A. |
+| `examples/` | Ready-to-tweak client configs (dental, salon, home-services). |
 
 ## Handy endpoints
 - `GET /` — the browser voice demo
@@ -108,7 +117,28 @@ minute**, versus a receptionist you can't scale to hundreds of simultaneous call
 - `POST /api/agent/turn` `{sessionId, text}` — one conversational turn (web)
 - `POST /api/vapi/function` — the phone agent's tool webhook
 - `GET /api/vapi/assistant` — copy-paste Vapi assistant config (no secrets)
-- `GET /api/inbox` — messages + human-transfer log the agent captured
+- `GET /admin` — dashboard (bookings, messages, transfers, usage)
+- `GET /api/admin/data` — the same data as JSON (send `x-admin-token` if `ADMIN_TOKEN` is set)
+- `POST /api/billing/checkout` — Stripe checkout link for a client (when configured)
+
+## Admin dashboard, usage & billing
+
+- **Admin dashboard:** `http://localhost:8787/admin` — this month's bookings, messages,
+  human transfers, and usage counters (bookings, phone minutes, calls, web chats). Set
+  `ADMIN_TOKEN` in `.env` to protect it; paste that token into the dashboard's token box.
+- **Usage for billing:** the backend counts bookings, phone **minutes** (from Vapi
+  end-of-call reports), calls, and web chats per month — `GET /api/admin/data` returns it.
+  Use `phoneMinutes` to bill overage.
+- **Stripe billing** (optional): set `STRIPE_SECRET_KEY` and two recurring Price IDs
+  (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`) from dashboard.stripe.com. Then
+  `POST /api/billing/checkout {"plan":"starter"|"pro","email":"client@x.com"}` returns a
+  Stripe Checkout link to send the client. Point a Stripe webhook at
+  `/api/billing/webhook` (set `STRIPE_WEBHOOK_SECRET`). Without keys, billing is simply off.
+
+## Deploy (go live)
+See **[DEPLOY.md](DEPLOY.md)** — one-click on Render (`render.yaml` at the repo root) or a
+`Dockerfile` for Railway/Fly/any container host. Set `ANTHROPIC_API_KEY`, `ADMIN_TOKEN`,
+and `PUBLIC_BASE_URL`, and you're live.
 
 ## Develop
 ```bash
@@ -138,8 +168,14 @@ BUSINESS_CONFIG=examples/salon.json npm start     # serve the salon
 
 So one deployment can serve many clients (run an instance per client with its own
 `BUSINESS_CONFIG` + phone number), or you just edit `business.config.json` for a single
-business. To onboard a new client: copy an example, fill in their name, hours, services,
-FAQ, greeting, and the number to transfer humans to — that's the whole job.
+business.
+
+**Onboard a new client in one command:**
+```bash
+npm run new-client        # answer a few questions → writes clients/<slug>.json
+BUSINESS_CONFIG=clients/<slug>.json npm start
+```
+Then fill in their services/FAQ/hours in that file, connect their calendar + number, done.
 
 > Before going live on your own line, set `phoneForHumans` in `business.config.json`
 > to a real number (it's currently a placeholder).

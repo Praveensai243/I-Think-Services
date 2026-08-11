@@ -1,16 +1,36 @@
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { business, env, hasBrain, usingGoogle } from "./config.js";
+import { business, env, hasBrain, usingGoogle, usingCalcom } from "./config.js";
 import { systemPrompt } from "./prompt.js";
 import { tools, runTool } from "./tools.js";
 import { respond } from "./agent.js";
-import { resetSession, messageLog, handoffLog } from "./store.js";
+import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
+import { getUsage, recordPhoneCall } from "./usage.js";
+import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+function calendarLabel(): string {
+  return usingGoogle ? "google" : usingCalcom ? "calcom" : "mock";
+}
+
 export function createServer() {
   const app = express();
+
+  // Stripe webhook needs the RAW body for signature verification — mount before json().
+  app.post("/api/billing/webhook", express.raw({ type: "*/*" }), (req, res) => {
+    try {
+      const event = verifyWebhook(req.body as Buffer, req.get("stripe-signature") ?? "");
+      // React to lifecycle events as needed (activate/deactivate a client, etc.)
+      console.log("stripe event:", event.type);
+      res.json({ received: true });
+    } catch (err) {
+      console.error("stripe webhook error", err);
+      res.status(400).json({ error: "invalid_signature" });
+    }
+  });
+
   app.use(express.json({ limit: "1mb" }));
 
   // ── health & public config for the demo UI ─────────────────────
@@ -18,7 +38,8 @@ export function createServer() {
     res.json({
       ok: true,
       brain: hasBrain ? "connected" : "demo-mode (no ANTHROPIC_API_KEY)",
-      calendar: usingGoogle ? "google" : "mock",
+      calendar: calendarLabel(),
+      billing: billingEnabled() ? "stripe" : "off",
       business: business.name,
     });
   });
@@ -53,9 +74,6 @@ export function createServer() {
     res.json({ ok: true });
   });
 
-  // simple front-desk views of what the agent captured
-  app.get("/api/inbox", (_req, res) => res.json({ messages: messageLog, handoffs: handoffLog }));
-
   // ── Vapi phone webhook: the phone agent calls our SAME tools ────
   app.post("/api/vapi/function", async (req, res) => {
     if (env.vapiSecret && req.get("x-vapi-secret") !== env.vapiSecret) {
@@ -65,26 +83,30 @@ export function createServer() {
     const sessionId = "vapi:" + (req.body?.call?.id ?? msg.call?.id ?? "unknown");
 
     try {
-      // Newer Vapi shape: { message: { type: "tool-calls", toolCallList: [{ id, function:{name,arguments}}] } }
+      // Completed call → record billable minutes.
+      if (msg.type === "end-of-call-report") {
+        const seconds = Number(msg.durationSeconds ?? msg.call?.durationSeconds ?? 0);
+        if (seconds > 0) recordPhoneCall(seconds);
+        return res.json({ ok: true });
+      }
+
       const toolCalls = msg.toolCallList ?? msg.toolCalls;
       if (msg.type === "tool-calls" && Array.isArray(toolCalls)) {
         const results = [];
         for (const c of toolCalls) {
           const name = c.function?.name ?? c.name;
           const args = parseArgs(c.function?.arguments ?? c.arguments);
-          const out = await runTool(name, args, sessionId);
+          const out = await runTool(name, args, sessionId, "phone");
           results.push({ toolCallId: c.id, result: JSON.stringify(out) });
         }
         return res.json({ results });
       }
 
-      // Older Vapi shape: { message: { type: "function-call", functionCall: { name, parameters } } }
       if (msg.type === "function-call" && msg.functionCall) {
-        const out = await runTool(msg.functionCall.name, parseArgs(msg.functionCall.parameters), sessionId);
+        const out = await runTool(msg.functionCall.name, parseArgs(msg.functionCall.parameters), sessionId, "phone");
         return res.json({ result: JSON.stringify(out) });
       }
 
-      // Anything else (status updates, transcripts) — acknowledge.
       return res.json({ ok: true });
     } catch (err) {
       console.error("vapi function error", err);
@@ -92,7 +114,6 @@ export function createServer() {
     }
   });
 
-  // ── ready-to-paste Vapi assistant config (no secrets) ──────────
   app.get("/api/vapi/assistant", (_req, res) => {
     res.json({
       name: `${business.name} — Receptionist`,
@@ -117,6 +138,39 @@ export function createServer() {
         "Create this assistant in Vapi, attach a phone number, and set the tool server secret to match VAPI_SECRET.",
     });
   });
+
+  // ── billing (client subscriptions) ─────────────────────────────
+  app.post("/api/billing/checkout", async (req, res) => {
+    if (!billingEnabled()) return res.status(501).json({ error: "billing_not_configured" });
+    try {
+      const plan = req.body?.plan === "pro" ? "pro" : "starter";
+      const url = await createCheckout(plan, { email: req.body?.email });
+      res.json({ url });
+    } catch (err) {
+      console.error("checkout error", err);
+      res.status(500).json({ error: "checkout_failed" });
+    }
+  });
+
+  // ── admin (token-protected) ────────────────────────────────────
+  const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+    if (!env.adminToken) return next(); // open when no token set (local dev)
+    const t = req.get("x-admin-token") ?? (req.query.token as string | undefined);
+    if (t === env.adminToken) return next();
+    res.status(401).json({ error: "unauthorized" });
+  };
+
+  app.get("/api/admin/data", requireAdmin, (_req, res) => {
+    res.json({
+      usage: getUsage(),
+      bookings: bookingLog.slice(0, 50),
+      messages: messageLog.slice(-50).reverse(),
+      handoffs: handoffLog.slice(0, 50),
+      billing: billingEnabled(),
+    });
+  });
+
+  app.get("/admin", (_req, res) => res.sendFile(resolve(__dirname, "../public/admin.html")));
 
   // ── static: the browser voice demo ─────────────────────────────
   app.use(express.static(resolve(__dirname, "../public")));

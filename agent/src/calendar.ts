@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { business, env, usingGoogle } from "./config.js";
+import { business, env, usingGoogle, usingCalcom } from "./config.js";
 
 export interface Slot {
   startISO: string;
@@ -55,6 +55,19 @@ function serviceMinutes(service?: string): number {
 // ── mock backend (keyless demo mode) ─────────────────────────────
 const mockBookings = new Map<string, Booking>();
 
+// ── Cal.com backend (v1 API; best-effort, validate with your key) ──
+async function calcom(path: string, init?: RequestInit): Promise<any> {
+  const base = "https://api.cal.com/v1";
+  const sep = path.includes("?") ? "&" : "?";
+  const res = await fetch(`${base}${path}${sep}apiKey=${env.calcom.apiKey}`, init);
+  if (!res.ok) throw new Error(`calcom ${res.status}: ${await res.text().catch(() => "")}`);
+  return res.json();
+}
+function phoneEmail(phone: string): string {
+  // Cal.com requires an attendee email; synthesize a stable placeholder for phone-only callers.
+  return `caller-${phone.replace(/\D/g, "") || "unknown"}@phone.invalid`;
+}
+
 // ── Google backend ───────────────────────────────────────────────
 function googleClient() {
   const oauth = new google.auth.OAuth2(
@@ -65,6 +78,13 @@ function googleClient() {
 }
 
 async function busyIntervals(fromISO: string, toISO: string): Promise<[number, number][]> {
+  if (usingCalcom) {
+    const data = await calcom(`/bookings`);
+    return (data.bookings ?? [])
+      .filter((b: any) => !/cancel/i.test(String(b.status ?? "")))
+      .map((b: any) => [Date.parse(b.startTime), Date.parse(b.endTime)] as [number, number])
+      .filter(([s, e]: [number, number]) => !isNaN(s) && !isNaN(e));
+  }
   if (!usingGoogle) {
     return [...mockBookings.values()]
       .filter((b) => b.status === "confirmed")
@@ -139,6 +159,30 @@ export async function book(input: {
   const svc = business.services.find((s) => s.id === input.service || s.name.toLowerCase() === input.service.toLowerCase());
   const summary = `${svc?.name ?? input.service} — ${input.name}`;
 
+  if (usingCalcom) {
+    const data = await calcom(`/bookings`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        eventTypeId: Number(env.calcom.eventTypeId),
+        start: start.toISOString(),
+        timeZone: business.timezone,
+        language: "en",
+        metadata: { phone: input.phone, service: svc?.name ?? input.service },
+        responses: { name: input.name, email: phoneEmail(input.phone) },
+      }),
+    });
+    const b = data.booking ?? data;
+    return {
+      ok: true,
+      booking: {
+        id: String(b.uid ?? b.id ?? "calcom"), name: input.name, phone: input.phone,
+        service: svc?.name ?? input.service, startISO: start.toISOString(),
+        endISO: end.toISOString(), status: "confirmed",
+      },
+    };
+  }
+
   if (usingGoogle) {
     const cal = googleClient();
     const res = await cal.events.insert({
@@ -173,6 +217,19 @@ export async function book(input: {
 async function findBooking(match: { phone?: string; name?: string }): Promise<Booking | undefined> {
   const last4 = (match.phone ?? "").replace(/\D/g, "").slice(-4);
   const name = (match.name ?? "").trim().toLowerCase();
+  if (usingCalcom) {
+    const data = await calcom(`/bookings`);
+    const ev = (data.bookings ?? []).find((b: any) => {
+      if (/cancel/i.test(String(b.status ?? ""))) return false;
+      const blob = `${b.title ?? ""} ${JSON.stringify(b.metadata ?? {})} ${JSON.stringify(b.attendees ?? [])}`.toLowerCase();
+      return (last4 && blob.includes(last4)) || (name && blob.includes(name));
+    });
+    if (!ev) return undefined;
+    return {
+      id: String(ev.uid ?? ev.id), name: match.name ?? "", phone: match.phone ?? "",
+      service: ev.title ?? "", startISO: ev.startTime ?? "", endISO: ev.endTime ?? "", status: "confirmed",
+    };
+  }
   if (usingGoogle) {
     const cal = googleClient();
     const res = await cal.events.list({
@@ -218,6 +275,10 @@ export async function cancel(input: {
 }): Promise<{ ok: boolean; reason?: string }> {
   const existing = await findBooking(input);
   if (!existing) return { ok: false, reason: "not_found" };
+  if (usingCalcom) {
+    await calcom(`/bookings/${existing.id}/cancel`, { method: "POST" });
+    return { ok: true };
+  }
   if (usingGoogle) {
     const cal = googleClient();
     await cal.events.delete({ calendarId: env.google.calendarId, eventId: existing.id });

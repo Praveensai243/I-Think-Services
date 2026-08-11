@@ -1,7 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { business } from "./config.js";
 import { getAvailability, book, reschedule, cancel } from "./calendar.js";
-import { messageLog, handoffLog } from "./store.js";
+import { messageLog, handoffLog, bookingLog } from "./store.js";
+import { recordAction } from "./usage.js";
 
 /**
  * Tool definitions shared by BOTH surfaces:
@@ -111,7 +112,9 @@ export const tools: Anthropic.Tool[] = [
 type Json = Record<string, unknown>;
 
 /** Execute a tool by name and return a compact JSON-serializable result. */
-export async function runTool(name: string, input: Json, sessionId: string): Promise<Json> {
+export async function runTool(
+  name: string, input: Json, sessionId: string, source: "web" | "phone" = "web",
+): Promise<Json> {
   switch (name) {
     case "check_availability": {
       const slots = await getAvailability({
@@ -129,6 +132,11 @@ export async function runTool(name: string, input: Json, sessionId: string): Pro
         service: String(input.service), startISO: String(input.start_iso),
       });
       if (!r.ok) return { ok: false, reason: r.reason ?? "could_not_book" };
+      recordAction("book_appointment", true);
+      bookingLog.unshift({
+        id: r.booking!.id, name: r.booking!.name, phone: r.booking!.phone, service: r.booking!.service,
+        startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "booked",
+      });
       return {
         ok: true, confirmation: r.booking!.id,
         when: new Date(r.booking!.startISO).toISOString(),
@@ -141,11 +149,22 @@ export async function runTool(name: string, input: Json, sessionId: string): Pro
         newStartISO: String(input.new_start_iso),
       });
       if (!r.ok) return { ok: false, reason: r.reason ?? "could_not_reschedule" };
+      recordAction("reschedule_appointment", true);
+      bookingLog.unshift({
+        id: r.booking!.id, name: r.booking!.name, phone: r.booking!.phone, service: r.booking!.service,
+        startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "rescheduled",
+      });
       return { ok: true, confirmation: r.booking!.id, when: r.booking!.startISO, service: r.booking!.service };
     }
     case "cancel_appointment": {
       const r = await cancel({ phone: input.phone as string | undefined, name: input.name as string | undefined });
-      return r.ok ? { ok: true } : { ok: false, reason: r.reason ?? "not_found" };
+      if (!r.ok) return { ok: false, reason: r.reason ?? "not_found" };
+      recordAction("cancel_appointment", true);
+      bookingLog.unshift({
+        id: "-", name: String(input.name ?? ""), phone: String(input.phone ?? ""), service: "",
+        startISO: "", at: new Date().toISOString(), source, action: "cancelled",
+      });
+      return { ok: true };
     }
     case "answer_faq": {
       const topic = String(input.topic ?? "").toLowerCase();
@@ -159,10 +178,12 @@ export async function runTool(name: string, input: Json, sessionId: string): Pro
         name: String(input.name), phone: input.phone ? String(input.phone) : undefined,
         message: String(input.message), at: new Date().toISOString(), sessionId,
       });
+      recordAction("take_message", true);
       return { ok: true };
     }
     case "transfer_to_human": {
-      handoffLog.push({ reason: String(input.reason ?? ""), at: new Date().toISOString(), sessionId });
+      handoffLog.unshift({ reason: String(input.reason ?? ""), at: new Date().toISOString(), sessionId });
+      recordAction("transfer_to_human", true);
       return { ok: true, number: business.phoneForHumans, action: "connect_to_human" };
     }
     default:

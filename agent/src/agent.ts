@@ -3,6 +3,7 @@ import { env, hasBrain, business } from "./config.js";
 import { systemPrompt } from "./prompt.js";
 import { tools, runTool } from "./tools.js";
 import { getSession } from "./store.js";
+import { recordWebTurn } from "./usage.js";
 
 const client = hasBrain ? new Anthropic({ apiKey: env.anthropicKey }) : null;
 
@@ -23,6 +24,7 @@ export async function respond(sessionId: string, userText: string): Promise<Agen
   const session = getSession(sessionId);
   session.messages.push({ role: "user", content: userText });
   session.updatedAt = Date.now();
+  recordWebTurn(sessionId);
 
   if (!client) {
     return {
