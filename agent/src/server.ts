@@ -2,9 +2,9 @@ import express, { type Request, type Response, type NextFunction } from "express
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { business, env, hasBrain, usingGoogle, usingCalcom } from "./config.js";
-import { systemPrompt } from "./prompt.js";
-import { tools, runTool } from "./tools.js";
-import { respond } from "./agent.js";
+import { runTool } from "./tools.js";
+import type Anthropic from "@anthropic-ai/sdk";
+import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
@@ -114,28 +114,85 @@ export function createServer() {
     }
   });
 
+  // ── Vapi "Custom LLM": our backend IS the brain ────────────────
+  // Vapi posts an OpenAI-style chat request here; we run the whole Claude
+  // agent (prompt + booking tools) and reply. This makes the Vapi setup a
+  // one-URL affair — no tools or model keys to configure on their side.
+  app.post("/api/vapi/chat/completions", async (req, res) => {
+    if (env.vapiSecret) {
+      const bearer = (req.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const tok = bearer || req.get("x-vapi-secret");
+      if (tok !== env.vapiSecret) return res.status(401).json({ error: "unauthorized" });
+    }
+    const body = req.body ?? {};
+    const incoming: any[] = Array.isArray(body.messages) ? body.messages : [];
+
+    // Build Claude history from the transcript (our own system prompt wins,
+    // so we ignore Vapi's system messages). Claude must start with a user turn.
+    const history: Anthropic.MessageParam[] = [];
+    for (const m of incoming) {
+      if (m.role !== "user" && m.role !== "assistant") continue;
+      const text = typeof m.content === "string"
+        ? m.content
+        : Array.isArray(m.content)
+          ? m.content.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join(" ")
+          : "";
+      if (text.trim()) history.push({ role: m.role, content: text });
+    }
+    while (history.length && history[0].role === "assistant") history.shift();
+    if (!history.length) history.push({ role: "user", content: "Hello" });
+
+    const callId = body?.call?.id ?? body?.metadata?.call?.id ?? "phone";
+    let reply = "…";
+    try {
+      const out = await runAgent(history, "vapi:" + callId, "phone");
+      reply = out.reply || "…";
+    } catch (err) {
+      console.error("custom-llm error", err);
+      reply = "Sorry, I didn't catch that — could you say it again?";
+    }
+
+    const id = "chatcmpl-" + Date.now();
+    const created = Math.floor(Date.now() / 1000);
+    const model = body.model || env.model;
+
+    if (body.stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      const chunk = (delta: object, finish: string | null) =>
+        `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+      res.write(chunk({ role: "assistant", content: reply }, null));
+      res.write(chunk({}, "stop"));
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+    res.json({
+      id, object: "chat.completion", created, model,
+      choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    });
+  });
+
   app.get("/api/vapi/assistant", (_req, res) => {
     res.json({
       name: `${business.name} — Receptionist`,
       firstMessage: business.greeting,
+      // Custom LLM: our backend is the brain (prompt + booking tools live here),
+      // so Vapi just forwards the conversation. No tools/model keys to set in Vapi.
       model: {
-        provider: "anthropic",
+        provider: "custom-llm",
+        url: `${env.publicBaseUrl}/api/vapi/chat/completions`,
         model: env.model,
-        temperature: 0.4,
-        messages: [{ role: "system", content: systemPrompt() }],
-        tools: tools.map((t) => ({
-          type: "function",
-          function: { name: t.name, description: t.description, parameters: t.input_schema },
-          server: { url: `${env.publicBaseUrl}/api/vapi/function` },
-        })),
       },
       voice: env.elevenLabsVoiceId
         ? { provider: "11labs", voiceId: env.elevenLabsVoiceId }
         : { provider: "vapi", voiceId: "Elliot" },
       transcriber: { provider: "deepgram", model: "nova-2" },
-      server: { url: `${env.publicBaseUrl}/api/vapi/function` },
+      // Server URL receives call events (e.g. end-of-call reports → billable minutes).
+      server: { url: `${env.publicBaseUrl}/api/vapi/function`, secret: env.vapiSecret || undefined },
       _note:
-        "Create this assistant in Vapi, attach a phone number, and set the tool server secret to match VAPI_SECRET.",
+        "In Vapi: create an assistant with model provider 'custom-llm' pointing at the url above, pick a voice, and attach a phone number. Set PUBLIC_BASE_URL on the server to your Render URL first.",
     });
   });
 
