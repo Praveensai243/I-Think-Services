@@ -57,6 +57,7 @@ export const env = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     redirectUri: process.env.GOOGLE_REDIRECT_URI ?? "",
     refreshToken: process.env.GOOGLE_REFRESH_TOKEN ?? "",
+    serviceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "",
     calendarId: process.env.GOOGLE_CALENDAR_ID ?? "primary",
   },
 };
@@ -64,10 +65,47 @@ export const env = {
 /** True when we can actually call Claude. Without it, the demo replies with a canned notice. */
 export const hasBrain = Boolean(env.anthropicKey);
 
+/**
+ * Service-account credentials, when supplied. Accepts either the raw JSON key or
+ * that JSON base64-encoded — hosts like Render mangle multi-line env values, so
+ * base64 is the reliable way to paste a key in.
+ */
+export interface ServiceAccountKey {
+  client_email: string;
+  private_key: string;
+}
+function parseServiceAccount(raw: string): ServiceAccountKey | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const json = text.startsWith("{")
+    ? text
+    : Buffer.from(text, "base64").toString("utf8");
+  try {
+    const key = JSON.parse(json);
+    if (!key.client_email || !key.private_key) return null;
+    // Escaped newlines survive a round-trip through most env-var UIs; restore them.
+    return {
+      client_email: String(key.client_email),
+      private_key: String(key.private_key).replace(/\\n/g, "\n"),
+    };
+  } catch {
+    return null;
+  }
+}
+export const googleServiceAccount = parseServiceAccount(env.google.serviceAccountJson);
+
+/** How we authenticate to Google, if at all. */
+export const googleAuthMode: "service-account" | "oauth" | "none" =
+  env.calendar !== "google"
+    ? "none"
+    : googleServiceAccount
+      ? "service-account"
+      : env.google.clientId && env.google.clientSecret && env.google.refreshToken
+        ? "oauth"
+        : "none";
+
 /** True when a real Google Calendar is configured. */
-export const usingGoogle =
-  env.calendar === "google" &&
-  Boolean(env.google.clientId && env.google.clientSecret && env.google.refreshToken);
+export const usingGoogle = googleAuthMode !== "none";
 
 /** True when Cal.com is configured. */
 export const usingCalcom = env.calendar === "calcom" && Boolean(env.calcom.apiKey);

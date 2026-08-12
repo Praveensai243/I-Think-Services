@@ -33,8 +33,10 @@ container host.
 | `MODEL` | optional | `claude-opus-5` (default) or `claude-haiku-4-5` (lowest phone latency) |
 | `ADMIN_TOKEN` | recommended | Protects `/admin`; without it the dashboard is open |
 | `PUBLIC_BASE_URL` | after deploy | Your service's https URL (used in the Vapi config it generates) |
-| `CALENDAR` | booking | `mock` (default) · `google` · `calcom` |
-| `GOOGLE_*` | Google Calendar | See main README §3 |
+| `CALENDAR` | booking | `mock` (default, in-memory — lost on restart) · `google` · `calcom` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Google Calendar | Base64 of the service-account key; share the calendar with its `client_email`. See README §3 |
+| `GOOGLE_CALENDAR_ID` | Google Calendar | The shared calendar's id — not `primary` when using a service account |
+| `GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN` | Google Calendar | OAuth fallback only. See README §3 |
 | `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID` | Cal.com | See main README |
 | `VAPI_SECRET` | phone | Shared secret for the Vapi tool webhook |
 | `ELEVENLABS_VOICE_ID` | phone voice | Optional premium voice |
@@ -43,6 +45,8 @@ container host.
 ## After it's live
 - **Browser demo:** `https://<your-url>/` — talk to it.
 - **Admin dashboard:** `https://<your-url>/admin` — bookings, messages, usage.
+- **Calendar wiring:** `https://<your-url>/api/admin/calendar-check?token=<ADMIN_TOKEN>`
+  — confirms the agent can read/write the real calendar before you rely on a call.
 - **Phone:** point a Vapi assistant at `https://<your-url>/api/vapi/function` (grab the
   ready config from `https://<your-url>/api/vapi/assistant`), attach a number, call it.
 

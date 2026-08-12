@@ -1,5 +1,9 @@
 import { google } from "googleapis";
-import { business, env, usingGoogle, usingCalcom } from "./config.js";
+import {
+  business, env, usingGoogle, usingCalcom, googleAuthMode, googleServiceAccount,
+} from "./config.js";
+
+const GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
 export interface Slot {
   startISO: string;
@@ -45,6 +49,16 @@ function labelFor(startISO: string): string {
 }
 const DOW = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
+/**
+ * Recover a service name from a stored event title. Google/Cal.com hand back the
+ * summary we wrote (`"Cleaning — Jane Doe"`), not the service id, so a reschedule
+ * would otherwise fall back to the default slot length and book the wrong duration.
+ */
+function serviceFromSummary(summary: string): string {
+  const head = summary.split("—")[0].trim();
+  return head || summary;
+}
+
 function serviceMinutes(service?: string): number {
   const s = business.services.find(
     (x) => x.id === service || x.name.toLowerCase() === (service ?? "").toLowerCase(),
@@ -70,11 +84,65 @@ function phoneEmail(phone: string): string {
 
 // ── Google backend ───────────────────────────────────────────────
 function googleClient() {
+  if (googleAuthMode === "service-account" && googleServiceAccount) {
+    // The business shares its calendar with the service account's email; no
+    // consent screen, no refresh tokens to rotate, nothing to expire.
+    const jwt = new google.auth.JWT({
+      email: googleServiceAccount.client_email,
+      key: googleServiceAccount.private_key,
+      scopes: GOOGLE_SCOPES,
+    });
+    return google.calendar({ version: "v3", auth: jwt });
+  }
   const oauth = new google.auth.OAuth2(
     env.google.clientId, env.google.clientSecret, env.google.redirectUri,
   );
   oauth.setCredentials({ refresh_token: env.google.refreshToken });
   return google.calendar({ version: "v3", auth: oauth });
+}
+
+/**
+ * Confirm we can actually read and write the configured calendar, so setup can be
+ * verified without placing a phone call. Writes nothing.
+ */
+export async function checkGoogleAccess(): Promise<
+  { ok: true; calendar: string; auth: string } | { ok: false; reason: string; hint?: string }
+> {
+  if (!usingGoogle) return { ok: false, reason: "google_not_configured" };
+  if (googleAuthMode === "service-account" && env.google.calendarId === "primary") {
+    return {
+      ok: false,
+      reason: "calendar_id_is_primary",
+      hint: "A service account's own 'primary' calendar is not the business calendar. Set GOOGLE_CALENDAR_ID to the calendar you shared with " +
+        `${googleServiceAccount?.client_email ?? "the service account"}.`,
+    };
+  }
+  try {
+    const cal = googleClient();
+    const meta = await cal.calendars.get({ calendarId: env.google.calendarId });
+    // freebusy is the call availability depends on — exercise it too.
+    await cal.freebusy.query({
+      requestBody: {
+        timeMin: new Date().toISOString(),
+        timeMax: new Date(Date.now() + 864e5).toISOString(),
+        items: [{ id: env.google.calendarId }],
+      },
+    });
+    return {
+      ok: true,
+      calendar: meta.data.summary ?? env.google.calendarId,
+      auth: googleAuthMode,
+    };
+  } catch (err: any) {
+    const status = err?.code ?? err?.response?.status;
+    const hint =
+      status === 404
+        ? `Calendar '${env.google.calendarId}' not found. Share it with ${googleServiceAccount?.client_email ?? "the configured account"} and use the calendar's ID from Google Calendar → Settings → Integrate calendar.`
+        : status === 403
+          ? "Access denied. Grant 'Make changes to events' on the shared calendar, and confirm the Google Calendar API is enabled for the project."
+          : undefined;
+    return { ok: false, reason: String(err?.message ?? err), hint };
+  }
 }
 
 async function busyIntervals(fromISO: string, toISO: string): Promise<[number, number][]> {
@@ -97,8 +165,13 @@ async function busyIntervals(fromISO: string, toISO: string): Promise<[number, n
       items: [{ id: env.google.calendarId }],
     },
   });
-  const busy = res.data.calendars?.[env.google.calendarId]?.busy ?? [];
-  return busy.map((b) => [Date.parse(b.start!), Date.parse(b.end!)] as [number, number]);
+  // Google echoes back the id we asked for, but fall back to the sole entry rather
+  // than silently reporting "wide open" if that ever stops holding.
+  const cals = res.data.calendars ?? {};
+  const busy = cals[env.google.calendarId]?.busy ?? Object.values(cals)[0]?.busy ?? [];
+  return busy
+    .map((b) => [Date.parse(b.start!), Date.parse(b.end!)] as [number, number])
+    .filter(([s, e]) => !isNaN(s) && !isNaN(e));
 }
 
 // ── public API used by the tools ─────────────────────────────────
@@ -187,6 +260,9 @@ export async function book(input: {
     const cal = googleClient();
     const res = await cal.events.insert({
       calendarId: env.google.calendarId,
+      // A service account cannot email invitations without domain-wide delegation,
+      // and we don't add attendees — caller details live in the description.
+      sendUpdates: "none",
       requestBody: {
         summary,
         description: `Booked by AI receptionist.\nCaller: ${input.name}\nPhone: ${input.phone}`,
@@ -238,14 +314,16 @@ async function findBooking(match: { phone?: string; name?: string }): Promise<Bo
       singleEvents: true, orderBy: "startTime", maxResults: 20,
     });
     const ev = (res.data.items ?? []).find((e) => {
+      // All-day entries (date, no dateTime) are holidays/blocks, never our bookings.
+      if (!e.start?.dateTime || !e.end?.dateTime) return false;
       const blob = `${e.summary ?? ""} ${e.description ?? ""}`.toLowerCase();
       return (last4 && blob.includes(last4)) || (name && blob.includes(name));
     });
     if (!ev) return undefined;
     return {
       id: ev.id!, name: match.name ?? "", phone: match.phone ?? "",
-      service: ev.summary ?? "", startISO: ev.start?.dateTime ?? "",
-      endISO: ev.end?.dateTime ?? "", status: "confirmed",
+      service: ev.summary ?? "", startISO: ev.start!.dateTime!,
+      endISO: ev.end!.dateTime!, status: "confirmed",
     };
   }
   return [...mockBookings.values()].find((b) => {
@@ -260,14 +338,38 @@ export async function reschedule(input: {
 }): Promise<{ ok: boolean; booking?: Booking; reason?: string }> {
   const existing = await findBooking(input);
   if (!existing) return { ok: false, reason: "not_found" };
-  const cancelled = await cancel({ phone: input.phone, name: input.name });
-  if (!cancelled.ok) return { ok: false, reason: "not_found" };
-  return book({
+
+  const service = serviceFromSummary(existing.service);
+  const start = new Date(input.newStartISO);
+  if (isNaN(start.getTime())) return { ok: false, reason: "invalid_time" };
+  const end = new Date(start.getTime() + serviceMinutes(service) * 60000);
+  const caller = {
     name: existing.name || input.name || "Caller",
     phone: existing.phone || input.phone || "",
-    service: existing.service,
-    startISO: input.newStartISO,
-  });
+    service,
+  };
+
+  // Confirm the new window is free BEFORE releasing the old one — cancelling first
+  // means a rejected rebooking leaves the caller with no appointment at all. The
+  // caller's own current slot is excluded so moving 2:00 → 2:30 isn't self-blocking.
+  const ownStart = Date.parse(existing.startISO);
+  const ownEnd = Date.parse(existing.endISO);
+  const conflicts = (await busyIntervals(start.toISOString(), end.toISOString()))
+    .filter(([bs, be]) => !(bs === ownStart && be === ownEnd))
+    .some(([bs, be]) => start.getTime() < be && end.getTime() > bs);
+  if (conflicts) return { ok: false, reason: "slot_taken" };
+
+  const cancelled = await cancel({ phone: input.phone, name: input.name });
+  if (!cancelled.ok) return { ok: false, reason: "not_found" };
+
+  const moved = await book({ ...caller, startISO: start.toISOString() });
+  if (!moved.ok) {
+    // Narrow race: the slot went between our check and the write. Restore the
+    // original appointment rather than dropping it on the floor.
+    await book({ ...caller, startISO: existing.startISO });
+    return { ok: false, reason: moved.reason ?? "slot_taken" };
+  }
+  return moved;
 }
 
 export async function cancel(input: {
