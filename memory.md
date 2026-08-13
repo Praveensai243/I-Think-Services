@@ -80,22 +80,31 @@ smarts), `ADMIN_TOKEN`, `PUBLIC_BASE_URL` (= the Render URL), `CALENDAR`, `GOOGL
   assistant Server URL to `/api/vapi/function` to capture billable minutes.
 - **Done =** call the number, Ava answers in a natural voice, books a demo, shows in `/admin`.
 
-**Calendar — code ready, needs 10 min of setup (not started in the dashboard):**
-- The backend now supports a **Google service account**: share a calendar with the
-  service account's `client_email` ("Make changes to events"), set `CALENDAR=google`,
-  `GOOGLE_SERVICE_ACCOUNT_JSON` (base64 of the key) and `GOOGLE_CALENDAR_ID`. Full steps
-  in `agent/README.md` §3. Verify with `/api/admin/calendar-check?token=<ADMIN_TOKEN>`.
+**Calendar — LIVE ✅ (real Google Calendar, verified 2026-08-13):**
+- Bookings write to **contact@ithinkservices.net**'s calendar; availability comes from its
+  real free/busy. Verified via `/api/admin/calendar-check?token=<ADMIN_TOKEN>` →
+  `{"calendar":"contact@ithinkservices.net","ok":true,"auth":"service-account"}`.
+- **Auth = Google service account.** The calendar is shared with the service account's
+  `client_email` ("Make changes to events"); Render holds `CALENDAR=google`,
+  `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_CALENDAR_ID`. Steps in `agent/README.md` §3.
 - Chosen over OAuth because OAuth refresh tokens **expire after 7 days** while the Google
   app is in Testing, and escaping that needs Google's sensitive-scope verification review.
   The OAuth path still works and is kept as a fallback.
+- **Account split (non-obvious, don't re-derive):** GitHub / Render / Cloudflare are under
+  `santoo.saipraveen@gmail.com`; the **Google Cloud project `psychic-upgrade-505320-v2` and
+  the calendar are both under `contact@ithinkservices.net`**. Anything in the Google Cloud
+  console (enabling APIs, rotating the service-account key) must be done signed in as
+  contact — santoo has no access to that project. Use an incognito window to avoid Google
+  bouncing you to the wrong account.
 - **Scope note:** this is for **our own** calendar so demo bookings survive restarts
   (`mock` is an in-memory Map — every Render deploy wipes booked sales calls). Client
   calendar onboarding is deliberately NOT built: most local businesses run on Vagaro /
   Booksy / Dentrix / Jobber, not Google, so the right integration is whatever customer #1
   actually uses. Don't guess before then.
 
-**Accounts:** Anthropic ✅ ($5 credit + key). Render ✅ (live; confirm Starter plan). Vapi:
-in setup. ElevenLabs / Twilio / Google Calendar / Stripe / Cal.com: later.
+**Accounts:** Anthropic ✅ ($5 credit + key). Render ✅ (live; confirm Starter plan).
+Google Calendar ✅ (service account, live). Vapi: in setup. ElevenLabs / Twilio / Stripe /
+Cal.com: later.
 
 ## 6. Decisions made
 - **Voice platform: start on Vapi** (already integrated + deployed + working). **Retell is
@@ -108,8 +117,7 @@ in setup. ElevenLabs / Twilio / Google Calendar / Stripe / Cal.com: later.
 
 ## 7. Deferred / roadmap (do later, in this order)
 1. **Finish the phone** (in progress).
-2. **Turn on the real calendar** — code is done; just the Google Cloud + sharing setup
-   above, then flip `CALENDAR=google` on Render.
+2. ~~Turn on the real calendar~~ **DONE** — live on contact@ithinkservices.net.
 3. **Website "Talk to Ava" widget** — DEFERRED. If built, it's a public metered endpoint →
    MUST add rate-limiting/abuse protection first (else bots burn Claude/Vapi spend). It's
    polish, not the bottleneck; validate demand first.
