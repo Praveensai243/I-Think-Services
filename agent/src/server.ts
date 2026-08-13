@@ -145,69 +145,33 @@ export function createServer() {
     if (!history.length) history.push({ role: "user", content: "Hello" });
 
     const callId = body?.call?.id ?? body?.metadata?.call?.id ?? "phone";
-    const id = "chatcmpl-" + Date.now();
-    const created = Math.floor(Date.now() / 1000);
-    const model = body.model || env.model;
-    const chunk = (delta: object, finish: string | null) =>
-      `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
-    // Telling Vapi to hang up = an OpenAI-style call to its built-in endCall function.
-    const END_CALL = [{ index: 0, id: "call_end", type: "function", function: { name: "endCall", arguments: "{}" } }];
-
-    // Streaming path: forward Claude's text the moment it appears so the voice
-    // starts speaking on the first words instead of after the whole reply.
-    if (body.stream) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.flushHeaders?.();
-      res.write(chunk({ role: "assistant", content: "" }, null));
-
-      let sentAny = false;
-      try {
-        const out = await runAgent(history, "vapi:" + callId, "phone", {
-          onText: (delta) => {
-            if (!delta) return;
-            sentAny = true;
-            res.write(chunk({ content: delta }, null));
-          },
-        });
-        if (out.ended) {
-          res.write(chunk({ tool_calls: END_CALL }, null));
-          res.write(chunk({}, "tool_calls"));
-        } else {
-          if (!sentAny) res.write(chunk({ content: out.reply || "…" }, null));
-          res.write(chunk({}, "stop"));
-        }
-      } catch (err) {
-        console.error("custom-llm error", err);
-        // Mid-stream failures have already spoken part of a sentence; finish it
-        // with something sayable rather than cutting out silently.
-        res.write(chunk({ content: sentAny ? " — sorry, could you say that again?" : "Sorry, I didn't catch that — could you say it again?" }, null));
-        res.write(chunk({}, "stop"));
-      }
-      res.write("data: [DONE]\n\n");
-      return res.end();
-    }
-
     let reply = "…";
-    let ended = false;
     try {
       const out = await runAgent(history, "vapi:" + callId, "phone");
       reply = out.reply || "…";
-      ended = Boolean(out.ended);
     } catch (err) {
       console.error("custom-llm error", err);
       reply = "Sorry, I didn't catch that — could you say it again?";
     }
+
+    const id = "chatcmpl-" + Date.now();
+    const created = Math.floor(Date.now() / 1000);
+    const model = body.model || env.model;
+
+    if (body.stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      const chunk = (delta: object, finish: string | null) =>
+        `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+      res.write(chunk({ role: "assistant", content: reply }, null));
+      res.write(chunk({}, "stop"));
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
     res.json({
       id, object: "chat.completion", created, model,
-      choices: [{
-        index: 0,
-        message: ended
-          ? { role: "assistant", content: reply, tool_calls: END_CALL }
-          : { role: "assistant", content: reply },
-        finish_reason: ended ? "tool_calls" : "stop",
-      }],
+      choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
     });
   });
