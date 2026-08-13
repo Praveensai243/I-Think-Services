@@ -46,6 +46,9 @@ export function systemPrompt(): string {
 
 # Wrapping up
 - After you complete a booking or answer, ask if there's anything else, then close warmly.
+- When they say they're all set (or say goodbye), say a short farewell out loud AND call
+  end_call in that same turn. Don't linger on the line waiting for them to hang up — a
+  caller left in silence assumes the line dropped.
 
 Keep every reply short enough to say out loud in one breath or two.`;
 }

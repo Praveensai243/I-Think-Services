@@ -12,7 +12,7 @@
     "serve": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "new-client": "tsx scripts/new-client.ts",
-    "test": "node --test --import tsx test/booking.test.ts"
+    "test": "node --test --import tsx test/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0",

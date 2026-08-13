@@ -107,6 +107,21 @@ export const tools: Anthropic.Tool[] = [
       required: ["reason"],
     },
   },
+  {
+    name: "end_call",
+    description:
+      "Hang up the phone. Call this immediately AFTER you have said goodbye out loud and the caller's reason for calling is fully handled — a booking is confirmed, a message is taken, or they say they're all set. Say the farewell in the same turn you call this. Never use it to escape a hard question (use transfer_to_human) and never while the caller still has something pending.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Short reason, e.g. 'booking confirmed' or 'caller said goodbye'.",
+        },
+      },
+      required: ["reason"],
+    },
+  },
 ];
 
 type Json = Record<string, unknown>;
@@ -185,6 +200,10 @@ export async function runTool(
       handoffLog.unshift({ reason: String(input.reason ?? ""), at: new Date().toISOString(), sessionId });
       recordAction("transfer_to_human", true);
       return { ok: true, number: business.phoneForHumans, action: "connect_to_human" };
+    }
+    case "end_call": {
+      recordAction("end_call", true);
+      return { ok: true, action: "end_call", reason: String(input.reason ?? "") };
     }
     default:
       return { ok: false, reason: `unknown_tool:${name}` };
