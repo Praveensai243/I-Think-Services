@@ -79,7 +79,20 @@ smarts), `ADMIN_TOKEN`, `PUBLIC_BASE_URL` (= the Render URL), `CALENDAR`, `GOOGL
   call); optionally set `VAPI_SECRET` + paste as the custom-LLM "API key" in Vapi; set the
   assistant Server URL to `/api/vapi/function` to capture billable minutes.
 - **Done =** call the number, Ava answers in a natural voice, books a demo, shows in `/admin`.
-- Calendar is still **mock** — real Google Calendar is the next small step after the phone.
+
+**Calendar — code ready, needs 10 min of setup (not started in the dashboard):**
+- The backend now supports a **Google service account**: share a calendar with the
+  service account's `client_email` ("Make changes to events"), set `CALENDAR=google`,
+  `GOOGLE_SERVICE_ACCOUNT_JSON` (base64 of the key) and `GOOGLE_CALENDAR_ID`. Full steps
+  in `agent/README.md` §3. Verify with `/api/admin/calendar-check?token=<ADMIN_TOKEN>`.
+- Chosen over OAuth because OAuth refresh tokens **expire after 7 days** while the Google
+  app is in Testing, and escaping that needs Google's sensitive-scope verification review.
+  The OAuth path still works and is kept as a fallback.
+- **Scope note:** this is for **our own** calendar so demo bookings survive restarts
+  (`mock` is an in-memory Map — every Render deploy wipes booked sales calls). Client
+  calendar onboarding is deliberately NOT built: most local businesses run on Vagaro /
+  Booksy / Dentrix / Jobber, not Google, so the right integration is whatever customer #1
+  actually uses. Don't guess before then.
 
 **Accounts:** Anthropic ✅ ($5 credit + key). Render ✅ (live; confirm Starter plan). Vapi:
 in setup. ElevenLabs / Twilio / Google Calendar / Stripe / Cal.com: later.
@@ -95,7 +108,8 @@ in setup. ElevenLabs / Twilio / Google Calendar / Stripe / Cal.com: later.
 
 ## 7. Deferred / roadmap (do later, in this order)
 1. **Finish the phone** (in progress).
-2. **Real Google Calendar** so phone bookings land in a real schedule.
+2. **Turn on the real calendar** — code is done; just the Google Cloud + sharing setup
+   above, then flip `CALENDAR=google` on Render.
 3. **Website "Talk to Ava" widget** — DEFERRED. If built, it's a public metered endpoint →
    MUST add rate-limiting/abuse protection first (else bots burn Claude/Vapi spend). It's
    polish, not the bottleneck; validate demand first.
@@ -119,6 +133,7 @@ Setup fee ($250–$1,500) + monthly tiers with included minutes (Starter ~$99–
 salary and the cost of missed calls. The free demo (which the agent performs) is top-of-funnel.
 
 ## 10. Deployment workflow
-Develop on branch `claude/ithink-services-redesign-rz3kcb` → PR → merge to `main`. A merged
+Develop on the branch the session assigns (most recent: `claude/where-we-left-off-2yr4le`)
+→ PR → merge to `main`. A merged
 PR is finished; restart the branch from `main` for new work. `main` deploys both Cloudflare
 (site) and Render (agent). Commit style + attribution per the session's git rules.

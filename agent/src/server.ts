@@ -1,7 +1,8 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { business, env, hasBrain, usingGoogle, usingCalcom } from "./config.js";
+import { business, env, hasBrain, usingGoogle, usingCalcom, googleAuthMode } from "./config.js";
+import { checkGoogleAccess } from "./calendar.js";
 import { runTool } from "./tools.js";
 import type Anthropic from "@anthropic-ai/sdk";
 import { respond, runAgent } from "./agent.js";
@@ -12,7 +13,8 @@ import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function calendarLabel(): string {
-  return usingGoogle ? "google" : usingCalcom ? "calcom" : "mock";
+  if (usingGoogle) return `google (${googleAuthMode})`;
+  return usingCalcom ? "calcom" : "mock";
 }
 
 export function createServer() {
@@ -216,6 +218,20 @@ export function createServer() {
     if (t === env.adminToken) return next();
     res.status(401).json({ error: "unauthorized" });
   };
+
+  // Prove the calendar wiring works without placing a phone call. Read-only.
+  app.get("/api/admin/calendar-check", requireAdmin, async (_req, res) => {
+    if (!usingGoogle) {
+      return res.json({
+        ok: false,
+        calendar: calendarLabel(),
+        reason: usingCalcom
+          ? "Cal.com is the active backend; this check covers Google only."
+          : "CALENDAR is not set to google, so bookings live in memory and are lost on restart.",
+      });
+    }
+    res.json({ calendar: calendarLabel(), ...(await checkGoogleAccess()) });
+  });
 
   app.get("/api/admin/data", requireAdmin, (_req, res) => {
     res.json({

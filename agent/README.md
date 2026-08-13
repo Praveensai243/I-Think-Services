@@ -49,19 +49,45 @@ default) is the smartest but slower.
 
 ## 3. Book into a real calendar — Google
 
-Set `CALENDAR=google` and fill the Google vars in `.env`:
+Until you do this, bookings live in memory and **disappear on every restart or
+deploy** — fine for a demo, not for real appointments.
+
+### Recommended: a service account (share the calendar with a robot)
+
+No consent screen, no Google verification review, and nothing that expires.
 
 1. **console.cloud.google.com** → create a project → enable the **Google Calendar API**.
-2. **APIs & Services → Credentials → Create OAuth client ID → Web application.**
-   Add redirect URI `http://localhost:8787/oauth2/callback`. Copy the client ID/secret
-   into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
-3. Generate a **refresh token** for the account that owns the calendar (use the
-   [OAuth Playground](https://developers.google.com/oauthplayground/) with scope
-   `https://www.googleapis.com/auth/calendar`, "Use your own OAuth credentials"),
-   and paste it into `GOOGLE_REFRESH_TOKEN`.
-4. Set `GOOGLE_CALENDAR_ID` (`primary`, or a specific calendar's id).
+2. **IAM & Admin → Service Accounts → Create**. Skip the optional role grants.
+   Open it → **Keys → Add key → Create new key → JSON**, and download it.
+3. In **Google Calendar**, open the calendar you want bookings in →
+   **Settings and sharing → Share with specific people → Add people** → paste the
+   service account's `client_email` → permission **"Make changes to events"**.
+4. On the same settings page, copy the **Calendar ID** into `GOOGLE_CALENDAR_ID`.
+   With a service account this must be that shared calendar's id — *never* `primary`,
+   which points at the robot's own empty calendar.
+5. Set `CALENDAR=google` and put the key in `GOOGLE_SERVICE_ACCOUNT_JSON`. Base64 it
+   so the newlines survive the paste: `base64 -w0 service-account.json`.
 
-The agent now reads live availability and writes real events — no double-booking.
+### Fallback: OAuth refresh token
+
+Only if a calendar can't be shared. Create an **OAuth client ID → Web application**
+(redirect `http://localhost:8787/oauth2/callback`), fill `GOOGLE_CLIENT_ID` /
+`GOOGLE_CLIENT_SECRET`, then mint a refresh token via the
+[OAuth Playground](https://developers.google.com/oauthplayground/) with scope
+`https://www.googleapis.com/auth/calendar` into `GOOGLE_REFRESH_TOKEN`.
+
+> Heads-up: while the Google Cloud app sits in **Testing**, refresh tokens expire
+> after **7 days** and booking silently breaks. Publishing the app avoids that but
+> puts a sensitive scope through Google's verification review. This is why the
+> service account is the recommended path.
+
+### Confirm it works
+
+    curl "https://<your-url>/api/admin/calendar-check?token=$ADMIN_TOKEN"
+
+`{"ok":true,...}` means the agent can read and write that calendar — availability now
+comes from real free/busy and bookings become real events, with no double-booking.
+Anything else comes back with a `hint` naming the fix. The check writes nothing.
 
 **Prefer Cal.com?** Set `CALENDAR=calcom`, `CALCOM_API_KEY` (Settings → Developer → API
 keys), and `CALCOM_EVENT_TYPE_ID` (the event type callers book). Availability still comes
