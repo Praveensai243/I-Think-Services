@@ -70,18 +70,6 @@ export const tools: Anthropic.Tool[] = [
     },
   },
   {
-    name: "answer_faq",
-    description:
-      "Look up a factual answer about the business (hours, location, insurance, parking, payment, new patients). Call this for factual questions instead of guessing.",
-    input_schema: {
-      type: "object",
-      properties: {
-        topic: { type: "string", description: "What the caller asked about, e.g. 'insurance', 'parking', 'address'." },
-      },
-      required: ["topic"],
-    },
-  },
-  {
     name: "take_message",
     description:
       "Record a message for the team when the caller wants to leave a note rather than book, or when the right person isn't available.",
@@ -165,13 +153,6 @@ export async function runTool(
         startISO: "", at: new Date().toISOString(), source, action: "cancelled",
       });
       return { ok: true };
-    }
-    case "answer_faq": {
-      const topic = String(input.topic ?? "").toLowerCase();
-      const hit = business.faq.find(
-        (f) => topic.includes(f.q) || f.q.includes(topic) || f.a.toLowerCase().includes(topic),
-      );
-      return hit ? { answer: hit.a } : { answer: null, note: "No exact match; offer to take a message or transfer." };
     }
     case "take_message": {
       messageLog.push({

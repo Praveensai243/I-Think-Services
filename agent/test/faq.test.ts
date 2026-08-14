@@ -1,0 +1,53 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { tools } from "../src/tools.js";
+import { systemPrompt } from "../src/prompt.js";
+import { business } from "../src/config.js";
+
+test("every FAQ answer is in the prompt", () => {
+  const p = systemPrompt();
+  for (const f of business.faq) {
+    assert.ok(
+      p.includes(f.a),
+      `FAQ "${f.q}" is missing from the prompt — the agent cannot answer it`,
+    );
+  }
+});
+
+test("no FAQ lookup tool — the knowledge is inline", () => {
+  // A tool round trip on every factual question is latency the caller hears.
+  assert.equal(tools.find((t) => t.name === "answer_faq"), undefined);
+});
+
+test("booking tools survive", () => {
+  for (const name of [
+    "check_availability", "book_appointment", "reschedule_appointment",
+    "cancel_appointment", "take_message", "transfer_to_human",
+  ]) {
+    assert.ok(tools.find((t) => t.name === name), `missing tool: ${name}`);
+  }
+});
+
+test("caller ID is offered back instead of asking for digits", () => {
+  const withId = systemPrompt({ callerPhone: "+17045551234" });
+  assert.match(withId, /\+17045551234/);
+  assert.match(withId, /best number/i);
+  assert.doesNotMatch(systemPrompt(), /\+1704555/);
+});
+
+test("digits are taken in chunks, never re-read whole", () => {
+  const p = systemPrompt();
+  assert.match(p, /chunks/i);
+  assert.match(p, /never make the caller repeat a whole number twice/i);
+});
+
+test("prompt reflects the client's own topics, not clinic assumptions", () => {
+  const p = systemPrompt();
+  assert.match(p, /pricing/);
+  assert.doesNotMatch(p, /parking/i);
+});
+
+test("the objective gives the call a purpose", () => {
+  assert.ok(business.objective, "I Think Services should have an objective set");
+  assert.match(systemPrompt(), /free AI demo and audit/);
+});

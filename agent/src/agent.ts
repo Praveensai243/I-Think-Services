@@ -27,6 +27,7 @@ const NOT_CONNECTED =
  */
 export async function runAgent(
   history: Anthropic.MessageParam[], sessionId: string, source: "web" | "phone",
+  ctx: { callerPhone?: string } = {},
 ): Promise<AgentTurn> {
   if (!client) return { reply: NOT_CONNECTED, actions: [] };
 
@@ -37,7 +38,7 @@ export async function runAgent(
     const res = await client.messages.create({
       model: env.model,
       max_tokens: 1024,
-      system: systemPrompt(),
+      system: systemPrompt(ctx),
       tools,
       messages: history,
     });
