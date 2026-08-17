@@ -51,3 +51,17 @@ test("the objective gives the call a purpose", () => {
   assert.ok(business.objective, "I Think Services should have an objective set");
   assert.match(systemPrompt(), /free AI demo and audit/);
 });
+
+// The whole FAQ ships inside the system prompt on EVERY turn, so its size is
+// paid for in latency on every single thing the caller says. This is a budget,
+// not a limit on knowledge: if it trips, tighten wording or merge overlapping
+// entries rather than raising the number without a thought about the caller.
+// Currently ~3.4k. The ceiling is set for headroom, not to rubber-stamp
+// whatever happens to be here — it should catch a careless doubling.
+test("the system prompt stays inside its latency budget", () => {
+  const approxTokens = systemPrompt().length / 4;
+  assert.ok(
+    approxTokens < 4000,
+    `system prompt is ~${Math.round(approxTokens)} tokens; every turn pays for this`,
+  );
+});
