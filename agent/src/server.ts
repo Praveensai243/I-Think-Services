@@ -307,7 +307,15 @@ export function callControlFor(
   if (out.transfer) {
     // Vapi passes the configured destination on the request; fall back to the
     // business's own human line so a missing config still reaches someone.
-    const destination = body?.destination ?? out.transfer.number ?? business.phoneForHumans;
+    const raw = body?.destination?.number ?? body?.destination ?? out.transfer.number ?? business.phoneForHumans;
+    const destination = toE164(raw);
+    if (!destination) {
+      // A destination Vapi cannot dial makes it END the call, which is the
+      // worst possible answer to "can I speak to a person?". Sending nothing
+      // at least leaves the caller on the line with the agent.
+      console.error("transfer skipped; destination is not dialable:", JSON.stringify(raw));
+      return null;
+    }
     return { function_call: { name: "transferCall", arguments: { destination } } };
   }
   if (out.ended) {
@@ -321,6 +329,21 @@ export function callControlFor(
     }
     return { function_call: { name: "endCall", arguments: {} } };
   }
+  return null;
+}
+
+/**
+ * Phone numbers are stored the way a receptionist says them out loud —
+ * "+1 (704) 387-9775" — but Vapi will only dial strict E.164. Handing it the
+ * spoken form fails the transfer, and a failed transfer makes Vapi hang up.
+ * Returns null when there is nothing dialable, so the caller keeps the line.
+ */
+export function toE164(raw: unknown): string | null {
+  const digits = String(raw ?? "").replace(/[^\d]/g, "");
+  if (!digits) return null;
+  if (digits.length === 10) return "+1" + digits;               // US, no country code
+  if (digits.length === 11 && digits.startsWith("1")) return "+" + digits;
+  if (digits.length >= 11 && digits.length <= 15) return "+" + digits;
   return null;
 }
 

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { callControlFor } from "../src/server.js";
 import { tools, runTool } from "../src/tools.js";
+import { business } from "../src/config.js";
 import { getAvailability, book } from "../src/calendar.js";
 
 /** The flag is read per call, so tests can flip it around a single assertion. */
@@ -167,5 +168,50 @@ test("a transfer is never blocked by the hang-up guard", () => {
   withCallControl(true, () => {
     const control = callControlFor({ transfer: { number: "+17043879775" } }, {}, "can I speak to someone?");
     assert.equal(control?.function_call.name, "transferCall");
+  });
+});
+
+// ── the destination must be dialable ───────────────────────────────
+// From a live call: the caller asked for a person and the call ENDED. The
+// destination was being sent as "+1 (704) 387-9775" — the spoken form — which
+// Vapi cannot dial, and a failed transfer makes Vapi hang up.
+
+import { toE164 } from "../src/server.js";
+
+test("the spoken phone number is converted to something Vapi can dial", () => {
+  assert.equal(toE164("+1 (704) 387-9775"), "+17043879775");
+  assert.equal(toE164("704-387-9775"), "+17043879775");
+  assert.equal(toE164("(704) 387 9775"), "+17043879775");
+  assert.equal(toE164("+17043879775"), "+17043879775");
+});
+
+test("an undialable destination is refused rather than hung up on", () => {
+  for (const bad of ["", "   ", "ask for Dave", "123"]) {
+    assert.equal(toE164(bad), null, `should not dial: ${bad}`);
+  }
+  withCallControl(true, () => {
+    assert.equal(
+      callControlFor({ transfer: { number: "not a number" } }, {}, "can I speak to someone?"), null,
+      "a bad destination must not reach Vapi — it ends the call",
+    );
+  });
+});
+
+test("the business's own configured number transfers cleanly", () => {
+  withCallControl(true, () => {
+    const control = callControlFor({ transfer: { number: business.phoneForHumans } }, {}, "get me a person");
+    assert.equal(control?.function_call.name, "transferCall");
+    assert.match(String(control?.function_call.arguments.destination), /^\+\d{11,15}$/);
+  });
+});
+
+test("Vapi's own destination object shape is understood", () => {
+  withCallControl(true, () => {
+    const control = callControlFor(
+      { transfer: { number: "+17040000000" } },
+      { destination: { type: "number", number: "+1 (999) 555-1234" } },
+      "transfer me",
+    );
+    assert.equal(control?.function_call.arguments.destination, "+19995551234");
   });
 });
