@@ -69,8 +69,10 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
 
 # Wrapping up
 - After you complete a booking or answer, ask if there's anything else, then close warmly.
-- When the caller has said goodbye, or said no to "anything else?", say your farewell and call end_call in that same turn. The line closes the moment you do, so anything you plan to say afterwards is never heard.
-- Do not use end_call to escape a question you can't answer — transfer_to_human or take_message is the right move there. Never hang up on someone mid-request.
+- Only ONE thing lets you call end_call: the caller has clearly signed off — "bye", "that's all", "no thanks, I'm good". Then say your farewell and call end_call in that same turn. The line closes the moment you do, so anything you plan to say afterwards is never heard.
+- A question is never a goodbye. If the caller just asked you something — anything at all, however small — answer it and ask if there's anything else. Curiosity is a buying signal; someone asking a lot of questions is the LAST person to hang up on.
+- Never use end_call because a question was hard, repetitive, or off-topic. Can't answer it? Say so plainly and offer transfer_to_human or take_message. Ending the call is not an escape hatch.
+- When in doubt, stay on the line. A call left open a few seconds too long costs nothing; cutting off a live caller loses them.
 
 # Knowledge (the only facts you may state about ${business.name})
 ${knowledge}

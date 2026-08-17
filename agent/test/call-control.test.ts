@@ -39,7 +39,8 @@ test("an ordinary turn never emits call control, flag on or off", () => {
 
 test("ending the call asks Vapi to hang up", () => {
   withCallControl(true, () => {
-    const control = callControlFor({ ended: true });
+    // The caller's own sign-off is required — see the hang-up guard below.
+    const control = callControlFor({ ended: true }, {}, "that's all, thanks — bye");
     assert.equal(control?.function_call.name, "endCall");
   });
 });
@@ -107,4 +108,64 @@ test("booking never promises a reminder we do not send", async () => {
     JSON.stringify(out).toLowerCase().includes("reminder"), false,
     "book_appointment must not mention a reminder while none is sent",
   );
+});
+
+// ── the hang-up guard ──────────────────────────────────────────────
+// From a live call: the caller asked several questions in a row and the agent
+// hung up on them. The prompt already said not to. These lock the behaviour in
+// code, where it holds no matter what the model decides.
+
+import { callerIsLeaving } from "../src/server.js";
+
+test("a caller still asking questions is never hung up on", () => {
+  withCallControl(true, () => {
+    for (const said of [
+      "what are your hours?",
+      "how much does it cost",
+      "can you also do text messages",
+      "one more thing — do you work weekends",
+      "and what about pricing for a second location",
+      "tell me more about the setup fee",
+    ]) {
+      assert.equal(
+        callControlFor({ ended: true }, {}, said), null,
+        `hung up on a caller who said: ${said}`,
+      );
+    }
+  });
+});
+
+test("a real sign-off does end the call", () => {
+  withCallControl(true, () => {
+    for (const said of [
+      "no thanks, that's all",
+      "okay, bye",
+      "nothing else, thank you",
+      "I'm all set",
+      "great, take care",
+    ]) {
+      const control = callControlFor({ ended: true }, {}, said);
+      assert.equal(control?.function_call.name, "endCall", `failed to hang up after: ${said}`);
+    }
+  });
+});
+
+test("silence or an unread turn keeps the line open", () => {
+  withCallControl(true, () => {
+    assert.equal(callControlFor({ ended: true }, {}, ""), null);
+    assert.equal(callControlFor({ ended: true }, {}, "   "), null);
+  });
+});
+
+test("a polite thanks that is really a question stays on the line", () => {
+  // "thanks, and can you also..." reads as a sign-off to a keyword match, but
+  // the caller is mid-sentence asking for more.
+  assert.equal(callerIsLeaving("thanks, and can you also book me for Tuesday"), false);
+});
+
+test("a transfer is never blocked by the hang-up guard", () => {
+  withCallControl(true, () => {
+    const control = callControlFor({ transfer: { number: "+17043879775" } }, {}, "can I speak to someone?");
+    assert.equal(control?.function_call.name, "transferCall");
+  });
 });
