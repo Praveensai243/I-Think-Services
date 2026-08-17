@@ -98,12 +98,16 @@ export const tools: Anthropic.Tool[] = [
   {
     name: "end_call",
     description:
-      "Hang up. Call this only once the conversation is genuinely finished — the caller has said goodbye, or you have asked whether there's anything else and they said no. Say your farewell in the SAME turn you call this, because the line closes immediately afterwards and nothing you say later is heard. This is not a way out of a hard question: if you cannot help, use transfer_to_human or take_message instead.",
+      "Hang up on the caller. Only ever call this when the caller's OWN last words were a sign-off — 'bye', 'that's all', 'no thanks, I'm good'. If their last words were a question of any kind, answer it instead; a question is never a goodbye, and someone asking many questions is the last person to hang up on. Never use this because a question was hard, repetitive, or off-topic — say so plainly and offer transfer_to_human or take_message. Say your farewell in the SAME turn you call this, because the line closes immediately and nothing you say afterwards is heard.",
     input_schema: {
       type: "object",
       properties: {
-        reason: { type: "string", description: "Why the call is over, e.g. 'caller said goodbye'." },
+        caller_said: {
+          type: "string",
+          description: "Quote the caller's own sign-off words. If you cannot quote one, do not call this tool.",
+        },
       },
+      required: ["caller_said"],
     },
   },
 ];

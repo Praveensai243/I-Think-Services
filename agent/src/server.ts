@@ -156,7 +156,7 @@ export function createServer() {
     try {
       const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
       reply = out.reply || "…";
-      control = callControlFor(out, body);
+      control = callControlFor(out, body, lastCallerText(history));
     } catch (err) {
       console.error("custom-llm error", err);
       reply = "Sorry, I didn't catch that — could you say it again?";
@@ -299,7 +299,9 @@ export type VapiControl = { function_call: { name: string; arguments: Record<str
  * for a person matters more than hanging up tidily.
  */
 export function callControlFor(
-  out: { transfer?: { number: string }; ended?: boolean }, body: any = {},
+  out: { transfer?: { number: string }; ended?: boolean },
+  body: any = {},
+  lastCallerText = "",
 ): VapiControl {
   if (!env.callControl) return null;
   if (out.transfer) {
@@ -308,8 +310,46 @@ export function callControlFor(
     const destination = body?.destination ?? out.transfer.number ?? business.phoneForHumans;
     return { function_call: { name: "transferCall", arguments: { destination } } };
   }
-  if (out.ended) return { function_call: { name: "endCall", arguments: {} } };
+  if (out.ended) {
+    if (!callerIsLeaving(lastCallerText)) {
+      // The agent asked to hang up on someone who was still talking. Refuse:
+      // the farewell is still spoken but the line stays open, which is exactly
+      // how the phone behaved before end_call existed. Prompt rules alone did
+      // not hold here — a caller asking several questions in a row got cut off.
+      console.warn("suppressed end_call; caller had not signed off:", JSON.stringify(lastCallerText.slice(0, 120)));
+      return null;
+    }
+    return { function_call: { name: "endCall", arguments: {} } };
+  }
   return null;
+}
+
+/** A question is never a goodbye, however politely it is phrased. */
+const ASKING = /\?|\b(what|how|why|when|where|who|which|can|could|do|does|did|is|are|will|would|should|tell me|explain|another|also|one more)\b/i;
+
+/** Plain ways a caller signals they are finished. */
+const SIGNING_OFF =
+  /\b(bye|goodbye|good night|that'?s (all|it|everything)|nothing else|no,? (thanks|thank you)|i'?m (all )?(good|set|done)|we'?re (good|done)|all set|have a (good|great|nice)|take care|talk (to you )?(later|soon)|appreciate it)\b/i;
+
+/**
+ * Whether the caller actually signed off. Deliberately strict: hanging up on a
+ * live caller is far worse than leaving a finished call open a few seconds
+ * longer, so anything ambiguous keeps the line.
+ */
+export function callerIsLeaving(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (!t) return false;
+  if (ASKING.test(t)) return false;
+  return SIGNING_OFF.test(t);
+}
+
+/** The caller's most recent words — what the hang-up guard is judged against. */
+function lastCallerText(history: Anthropic.MessageParam[]): string {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m.role === "user" && typeof m.content === "string") return m.content;
+  }
+  return "";
 }
 
 function parseArgs(raw: unknown): Record<string, unknown> {
