@@ -9,6 +9,7 @@ import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
+import { recordCallEvent, getCallEvents, short } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -157,7 +158,10 @@ export function createServer() {
       const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
       reply = out.reply || "…";
       control = callControlFor(out, body, lastCallerText(history));
-      if (out.transfer || out.ended) logCallControlDiagnostics(body, out, control);
+      // Recorded on EVERY turn, not just ones that move the line. An empty
+      // trail after a test call is itself the answer: it means Vapi never
+      // reached this endpoint.
+      logCallControlDiagnostics(body, out, control, lastCallerText(history), reply, callId);
     } catch (err) {
       console.error("custom-llm error", err);
       reply = "Sorry, I didn't catch that — could you say it again?";
@@ -266,6 +270,25 @@ export function createServer() {
     });
   });
 
+  /**
+   * What the phone agent did on recent turns. Built for debugging a live call
+   * from the phone you just called on, when the host's log viewer is not to
+   * hand. `toolsFromVapi` is the decisive field: Vapi sends the assistant's own
+   * tool list on every request, so if endCall and transferCall are missing
+   * there, they were never configured on the assistant.
+   */
+  app.get("/api/admin/diagnostics", requireAdmin, (_req, res) => {
+    const events = getCallEvents();
+    res.json({
+      note: events.length
+        ? "Newest first. toolsFromVapi lists what the Vapi assistant declares."
+        : "No turns recorded since the last restart — if you just called, Vapi never reached this server.",
+      controlEnabled: env.callControl,
+      count: events.length,
+      events,
+    });
+  });
+
   app.get("/admin", (_req, res) => res.sendFile(resolve(__dirname, "../public/admin.html")));
 
   // ── static: the browser voice demo ─────────────────────────────
@@ -361,16 +384,31 @@ export function sseFrames(
  * are not in it, they were never configured on the assistant and no change to
  * this codebase can make them work.
  */
-export function logCallControlDiagnostics(body: any, out: object, control: VapiControl): void {
+export function logCallControlDiagnostics(
+  body: any,
+  out: { transfer?: { number: string }; ended?: boolean },
+  control: VapiControl,
+  callerSaid = "",
+  agentSaid = "",
+  callId = "",
+): void {
   const tools = Array.isArray(body?.tools) ? body.tools : [];
-  console.log("CALL-CONTROL " + JSON.stringify({
-    decided: out,
-    sending: control,
+  const event = {
+    at: new Date().toISOString(),
+    callId: String(callId),
+    callerSaid: short(callerSaid),
+    agentSaid: short(agentSaid),
+    decided: { transfer: out.transfer?.number, ended: out.ended },
+    sentToVapi: control,
     toolsFromVapi: tools.map((t: any) => t?.type ?? t?.function?.name ?? "?"),
     destinationFromVapi: body?.destination ?? null,
-    streaming: Boolean(body?.stream),
     controlEnabled: env.callControl,
-  }));
+    streaming: Boolean(body?.stream),
+  };
+  recordCallEvent(event);
+  // Still logged for the host's log viewer; the endpoint is for when that is
+  // hard to reach from a phone.
+  if (out.transfer || out.ended) console.log("CALL-CONTROL " + JSON.stringify(event));
 }
 
 /**
