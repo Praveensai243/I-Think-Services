@@ -215,3 +215,38 @@ test("Vapi's own destination object shape is understood", () => {
     assert.equal(control?.function_call.arguments.destination, "+19995551234");
   });
 });
+
+// ── frame ordering ─────────────────────────────────────────────────
+// The control frame must REPLACE the stop, never follow it. Sending stop first
+// declares the turn finished and then keeps writing; when Vapi errors on that
+// it ends the call, which sounds exactly like a working hang-up. That
+// ambiguity is why the broken transfer survived two rounds of debugging.
+
+import { sseFrames } from "../src/server.js";
+
+const base = { id: "chatcmpl-1", created: 1, model: "gpt-4o", reply: "Sure thing." };
+
+test("an ordinary turn ends with stop, exactly as before", () => {
+  const f = sseFrames({ ...base, control: null });
+  assert.equal(f.length, 3);
+  assert.match(f[0], /"content":"Sure thing\."/);
+  assert.match(f[1], /"finish_reason":"stop"/);
+  assert.equal(f[2], "data: [DONE]\n\n");
+});
+
+test("a control frame replaces the stop instead of following it", () => {
+  const f = sseFrames({ ...base, control: { function_call: { name: "endCall", arguments: {} } } });
+  const body = f.join("");
+  assert.match(body, /"function_call"/);
+  assert.doesNotMatch(body, /"finish_reason":"stop"/, "stop must not accompany a control frame");
+});
+
+test("the spoken reply is always sent before the line is moved", () => {
+  const f = sseFrames({
+    ...base, reply: "Putting you through now.",
+    control: { function_call: { name: "transferCall", arguments: { destination: "+17043879775" } } },
+  });
+  assert.match(f[0], /Putting you through now\./);
+  assert.match(f[1], /transferCall/);
+  assert.equal(f[2], "data: [DONE]\n\n");
+});

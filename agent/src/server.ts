@@ -157,6 +157,7 @@ export function createServer() {
       const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
       reply = out.reply || "…";
       control = callControlFor(out, body, lastCallerText(history));
+      if (out.transfer || out.ended) logCallControlDiagnostics(body, out, control);
     } catch (err) {
       console.error("custom-llm error", err);
       reply = "Sorry, I didn't catch that — could you say it again?";
@@ -170,15 +171,7 @@ export function createServer() {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
-      const chunk = (delta: object, finish: string | null) =>
-        `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
-      // The reply always goes first and unchanged, so the farewell (or "putting
-      // you through") is spoken before the line moves. On an ordinary turn
-      // nothing below this fires and the frames are exactly what we sent before.
-      res.write(chunk({ role: "assistant", content: reply }, null));
-      res.write(chunk({}, "stop"));
-      if (control) res.write(`data: ${JSON.stringify(control)}\n\n`);
-      res.write("data: [DONE]\n\n");
+      for (const frame of sseFrames({ id, created, model, reply, control })) res.write(frame);
       return res.end();
     }
     res.json({
@@ -330,6 +323,54 @@ export function callControlFor(
     return { function_call: { name: "endCall", arguments: {} } };
   }
   return null;
+}
+
+/**
+ * The exact SSE frames sent to Vapi for one turn, as a list so the ordering is
+ * testable rather than something we infer from a phone call.
+ *
+ * The control frame REPLACES the stop; it never follows it. Sending stop first
+ * declares the completion finished and then keeps writing, and when Vapi
+ * errors on that it ends the call — which sounds exactly like a working
+ * hang-up. That ambiguity is why this took three attempts to see.
+ */
+export function sseFrames(
+  o: { id: string; created: number; model: string; reply: string; control: VapiControl },
+): string[] {
+  const chunk = (delta: object, finish: string | null) =>
+    `data: ${JSON.stringify({
+      id: o.id, object: "chat.completion.chunk", created: o.created, model: o.model,
+      choices: [{ index: 0, delta, finish_reason: finish }],
+    })}\n\n`;
+
+  // The reply always goes first, so the farewell (or "putting you through") is
+  // spoken before the line moves.
+  const frames = [chunk({ role: "assistant", content: o.reply }, null)];
+  frames.push(o.control ? `data: ${JSON.stringify(o.control)}\n\n` : chunk({}, "stop"));
+  frames.push("data: [DONE]\n\n");
+  return frames;
+}
+
+/**
+ * Printed only on turns that try to move or end the call — the ones we cannot
+ * diagnose from the outside, because a Vapi error and a working hang-up sound
+ * identical to the caller.
+ *
+ * `toolsFromVapi` is the one that settles the open question: Vapi sends the
+ * assistant's own tool list on every request, so if endCall and transferCall
+ * are not in it, they were never configured on the assistant and no change to
+ * this codebase can make them work.
+ */
+export function logCallControlDiagnostics(body: any, out: object, control: VapiControl): void {
+  const tools = Array.isArray(body?.tools) ? body.tools : [];
+  console.log("CALL-CONTROL " + JSON.stringify({
+    decided: out,
+    sending: control,
+    toolsFromVapi: tools.map((t: any) => t?.type ?? t?.function?.name ?? "?"),
+    destinationFromVapi: body?.destination ?? null,
+    streaming: Boolean(body?.stream),
+    controlEnabled: env.callControl,
+  }));
 }
 
 /**
