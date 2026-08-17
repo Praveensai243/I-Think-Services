@@ -45,6 +45,16 @@ export const env = {
   model: process.env.MODEL ?? "claude-opus-5",
   calendar: (process.env.CALENDAR ?? "mock").toLowerCase() as "mock" | "google" | "calcom",
   vapiSecret: process.env.VAPI_SECRET ?? "",
+  /**
+   * Lets the agent hang up and transfer by sending Vapi call-control payloads.
+   * Off by default and read per request, so if a live call misbehaves this can
+   * be switched off in the host's dashboard — no redeploy, no revert. #10 cost
+   * us a working phone precisely because recovery meant shipping code.
+   */
+  get callControl(): boolean {
+    const v = (process.env.VOICE_CALL_CONTROL ?? "").toLowerCase();
+    return v === "1" || v === "true" || v === "on";
+  },
   elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID ?? "",
   adminToken: process.env.ADMIN_TOKEN ?? "",
   stripe: {

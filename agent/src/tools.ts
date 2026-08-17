@@ -86,13 +86,24 @@ export const tools: Anthropic.Tool[] = [
   {
     name: "transfer_to_human",
     description:
-      "Hand the call to a person when the caller asks for one, is upset, has a billing dispute, or the situation is beyond scheduling. Returns the number/instructions to connect them.",
+      "Hand the call to a person when the caller asks for one, is upset, has a billing dispute, or the situation is beyond scheduling. On the phone this really does connect them, so tell the caller you're putting them through in the SAME turn you call this.",
     input_schema: {
       type: "object",
       properties: {
         reason: { type: "string", description: "Short reason for the transfer." },
       },
       required: ["reason"],
+    },
+  },
+  {
+    name: "end_call",
+    description:
+      "Hang up. Call this only once the conversation is genuinely finished — the caller has said goodbye, or you have asked whether there's anything else and they said no. Say your farewell in the SAME turn you call this, because the line closes immediately afterwards and nothing you say later is heard. This is not a way out of a hard question: if you cannot help, use transfer_to_human or take_message instead.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: "Why the call is over, e.g. 'caller said goodbye'." },
+      },
     },
   },
 ];
@@ -128,7 +139,11 @@ export async function runTool(
       return {
         ok: true, confirmation: r.booking!.id,
         when: new Date(r.booking!.startISO).toISOString(),
-        service: r.booking!.service, reminder: "A text/email reminder will be sent.",
+        service: r.booking!.service,
+        // No reminder is promised here on purpose: nothing in this codebase
+        // sends one. Read the time back instead — a confirmation the caller
+        // hears is worth more than a text that never arrives.
+        confirm: "Read the day and time back to the caller so they have it.",
       };
     }
     case "reschedule_appointment": {
@@ -165,7 +180,16 @@ export async function runTool(
     case "transfer_to_human": {
       handoffLog.unshift({ reason: String(input.reason ?? ""), at: new Date().toISOString(), sessionId });
       recordAction("transfer_to_human", true);
-      return { ok: true, number: business.phoneForHumans, action: "connect_to_human" };
+      // On the phone the caller is really connected — the endpoint turns this
+      // into a Vapi transferCall. On the web there is no line to move, so the
+      // number is all we can offer.
+      return source === "phone"
+        ? { ok: true, number: business.phoneForHumans, action: "connect_to_human",
+            say: "Tell the caller you're putting them through now." }
+        : { ok: true, number: business.phoneForHumans, action: "give_number" };
+    }
+    case "end_call": {
+      return { ok: true, action: "hang_up", say: "Say your goodbye now — the line closes right after this." };
     }
     default:
       return { ok: false, reason: `unknown_tool:${name}` };
