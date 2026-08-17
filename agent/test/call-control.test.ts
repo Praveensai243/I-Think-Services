@@ -250,3 +250,47 @@ test("the spoken reply is always sent before the line is moved", () => {
   assert.match(f[1], /transferCall/);
   assert.equal(f[2], "data: [DONE]\n\n");
 });
+
+// ── the diagnostics trail ──────────────────────────────────────────
+// Built because this bug is invisible from both ends: a caller cannot tell a
+// broken Vapi payload from a deliberate hang-up, and asking someone to search
+// a host log viewer mid-debugging did not produce an answer twice running.
+
+import { logCallControlDiagnostics } from "../src/server.js";
+import { getCallEvents } from "../src/diag.js";
+
+test("every turn is recorded, not only ones that move the line", () => {
+  const before = getCallEvents().length;
+  logCallControlDiagnostics({ stream: true }, {}, null, "what are your hours?", "We're open nine to six.", "call-1");
+  const events = getCallEvents();
+  assert.equal(events.length, before + 1, "an ordinary turn must still leave a trace");
+  assert.equal(events[0].callerSaid, "what are your hours?");
+  assert.equal(events[0].sentToVapi, null);
+});
+
+test("the trail captures the tools Vapi declares, which is the decisive field", () => {
+  logCallControlDiagnostics(
+    { stream: true, tools: [{ type: "endCall" }, { type: "transferCall" }], destination: "+19995551234" },
+    { transfer: { number: "+17043879775" } },
+    { function_call: { name: "transferCall", arguments: { destination: "+19995551234" } } },
+    "get me a person", "Putting you through.", "call-2",
+  );
+  const e = getCallEvents()[0];
+  assert.deepEqual(e.toolsFromVapi, ["endCall", "transferCall"]);
+  assert.equal(e.destinationFromVapi, "+19995551234");
+  assert.equal(e.decided.transfer, "+17043879775");
+});
+
+test("an assistant with no tools configured is visible in the trail", () => {
+  // The case we cannot currently rule out: Vapi sends no tools, so endCall and
+  // transferCall were never set up and no code change can make them work.
+  logCallControlDiagnostics({ stream: true }, { ended: true }, null, "bye", "Take care!", "call-3");
+  assert.deepEqual(getCallEvents()[0].toolsFromVapi, []);
+});
+
+test("the trail is capped so a long call cannot grow it without bound", () => {
+  for (let i = 0; i < 60; i++) {
+    logCallControlDiagnostics({ stream: true }, {}, null, `turn ${i}`, "ok", "call-4");
+  }
+  assert.ok(getCallEvents().length <= 50, "ring buffer must stay bounded");
+});
