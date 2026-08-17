@@ -10,7 +10,10 @@ const client = hasBrain ? new Anthropic({ apiKey: env.anthropicKey }) : null;
 export interface AgentTurn {
   reply: string;
   actions: { tool: string; result: Record<string, unknown> }[];
+  /** Set when the caller should be connected to a person; the phone endpoint acts on it. */
   transfer?: { number: string };
+  /** Set when the agent decided the conversation is over and the line should close. */
+  ended?: boolean;
 }
 
 const MAX_TOOL_ROUNDS = 6;
@@ -33,6 +36,7 @@ export async function runAgent(
 
   const actions: AgentTurn["actions"] = [];
   let transfer: AgentTurn["transfer"];
+  let ended = false;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await client.messages.create({
@@ -46,7 +50,7 @@ export async function runAgent(
     if (res.stop_reason === "refusal") {
       const reply = "I'm sorry, I can't help with that one — let me connect you with someone who can.";
       history.push({ role: "assistant", content: reply });
-      return { reply, actions, transfer };
+      return { reply, actions, transfer, ended };
     }
 
     // record the assistant turn verbatim (tool_use blocks must be preserved)
@@ -62,7 +66,7 @@ export async function runAgent(
         .map((b) => b.text)
         .join(" ")
         .trim();
-      return { reply: reply || "…", actions, transfer };
+      return { reply: reply || "…", actions, transfer, ended };
     }
 
     // execute every requested tool, return all results in one user turn
@@ -71,6 +75,7 @@ export async function runAgent(
       const out = await runTool(tu.name, (tu.input ?? {}) as Record<string, unknown>, sessionId, source);
       actions.push({ tool: tu.name, result: out });
       if (tu.name === "transfer_to_human" && out.number) transfer = { number: String(out.number) };
+      if (tu.name === "end_call") ended = true;
       results.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify(out) });
     }
     history.push({ role: "user", content: results });
@@ -78,7 +83,7 @@ export async function runAgent(
 
   const reply = "Let me get that sorted for you — one moment.";
   history.push({ role: "assistant", content: reply });
-  return { reply, actions, transfer };
+  return { reply, actions, transfer, ended };
 }
 
 /** Browser-demo entry point: keeps per-session history and records web usage. */

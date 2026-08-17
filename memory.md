@@ -71,14 +71,31 @@ smarts), `ADMIN_TOKEN`, `PUBLIC_BASE_URL` (= the Render URL), `CALENDAR`, `GOOGL
 23-topic AI-services knowledge); admin dashboard; usage tracking; Stripe billing
 (keyless-safe/off until keys added); multi-client configs; the custom-LLM brain.
 
-**In progress — THE PHONE (getting a real number to answer):**
-- Plan: in **Vapi**, create an assistant → Model provider **Custom LLM** → URL
-  `https://ithink-ai-agent.onrender.com/api/vapi/chat/completions` → pick a natural voice →
-  attach a phone number. Vapi needs **no** Anthropic key (our backend is the brain).
-- Prereqs: Render on **Starter** (always-on, else a sleeping Free instance drops the first
-  call); optionally set `VAPI_SECRET` + paste as the custom-LLM "API key" in Vapi; set the
-  assistant Server URL to `/api/vapi/function` to capture billable minutes.
-- **Done =** call the number, Ava answers in a natural voice, books a demo, shows in `/admin`.
+**THE PHONE — LIVE ✅ (first real calls 2026-08-13/14).** Vapi assistant → Model provider
+**Custom LLM** → `https://ithink-ai-agent.onrender.com/api/vapi/chat/completions` → voice →
+number. Vapi carries **no** Anthropic key (our backend is the brain). Keep Render on
+**Starter** (a sleeping Free instance drops the first call); `VAPI_SECRET` pastes in as the
+custom-LLM "API key"; assistant Server URL = `/api/vapi/function` to capture billable minutes.
+
+**What the live calls exposed (this is the current work):**
+1. **Latency** — the caller waits for Claude to finish the whole reply before hearing a
+   word. Still unfixed; see the #10 post-mortem below.
+2. **Digit capture** — the agent could not get a phone number right (ten repeats, still
+   wrong). Root cause is the cheap transcriber, not the prompt.
+3. **Fumbled its own FAQ** — `answer_faq` matched by substring, so *"how much does it
+   cost"* never reached the entry keyed `pricing`.
+
+**⚠️ #10 post-mortem — a silent phone (read before touching the voice path):**
+PR #10 shipped SSE token streaming **and** an `end_call` tool together. On deploy the phone
+went **completely silent** — no greeting, no response to speech. Reverted same day (#11);
+production is back on the slow-but-working single-chunk SSE. **The cause was never
+diagnosed** — and because the two changes shipped as one commit, we still don't know which
+one caused it. Diagnose from Render logs first, and put them back **separately**.
+
+**Next up:** PR #12 (caller-ID read-back, chunked digits, FAQ inlined into the prompt,
+per-call `objective`) — rebased onto main, conflict-free, typecheck clean, 13/13 tests,
+**ready to merge**. Deliberately touches no SSE transport code. After it merges, switch the
+Vapi transcriber to **Deepgram Nova** (console work, fixes misheard digits at the source).
 
 **Calendar — LIVE ✅ (real Google Calendar, verified 2026-08-13):**
 - Bookings write to **contact@ithinkservices.net**'s calendar; availability comes from its
@@ -114,10 +131,21 @@ Cal.com: later.
   wanted. **None are agency-native** → our backend + per-client configs + (future) agency
   portal ARE the white-label layer. Don't re-platform before validating demand.
 - **Model:** Claude via our backend; the voice platform carries no LLM key.
+- **Ship voice changes one at a time.** #10 bundled two changes, broke the phone, and cost
+  us the ability to tell which one did it. The **SSE transport is the danger zone** — a bug
+  there produces silence, not a bad answer, and silence is the one failure a caller cannot
+  work around. Logic/prompt changes are cheap and safe; transport changes ship alone, and
+  **always test by calling the number after deploy.**
 
 ## 7. Deferred / roadmap (do later, in this order)
-1. **Finish the phone** (in progress).
+0. ~~Get the phone answering~~ **DONE** — live, taking real calls.
+1. **Make the live phone good enough to demo:** merge PR #12 → switch the transcriber to
+   Deepgram Nova → then fix latency by re-attempting #10 **as two separate commits**
+   (`end_call` first, streaming second), diagnosing the silence from Render logs first.
 2. ~~Turn on the real calendar~~ **DONE** — live on contact@ithinkservices.net.
+2b. **Get the number in front of one real local business.** The product answers calls and
+   books to a real calendar; the bottleneck is now demand, not features. Recurring cost is
+   stacking with zero revenue — don't add surface area ahead of a paying customer.
 3. **Website "Talk to Ava" widget** — DEFERRED. If built, it's a public metered endpoint →
    MUST add rate-limiting/abuse protection first (else bots burn Claude/Vapi spend). It's
    polish, not the bottleneck; validate demand first.
@@ -141,7 +169,15 @@ Setup fee ($250–$1,500) + monthly tiers with included minutes (Starter ~$99–
 salary and the cost of missed calls. The free demo (which the agent performs) is top-of-funnel.
 
 ## 10. Deployment workflow
-Develop on the branch the session assigns (most recent: `claude/where-we-left-off-2yr4le`)
+Develop on the branch the session assigns (most recent: `claude/resume-project-memory-7qn1y3`)
 → PR → merge to `main`. A merged
 PR is finished; restart the branch from `main` for new work. `main` deploys both Cloudflare
 (site) and Render (agent). Commit style + attribution per the session's git rules.
+
+**Branch off `main`, not off another feature branch.** PR #12 was branched off the #11
+revert branch, so once #11 squash-merged, both sides carried their own copy of the same
+revert and GitHub called it a conflict. Fix is a rebase onto `main`, not a merge.
+
+**Check for open PRs at the start of a session.** #12 sat finished-but-unmerged in draft for
+three days because the handoff doc didn't mention it. `memory.md` is only as good as its
+last update — update it when the state changes, not just when a task finishes.

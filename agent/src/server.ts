@@ -152,9 +152,11 @@ export function createServer() {
       call?.customer?.number ?? call?.from ?? body?.customer?.number ?? undefined;
 
     let reply = "…";
+    let control: VapiControl = null;
     try {
       const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
       reply = out.reply || "…";
+      control = callControlFor(out, body);
     } catch (err) {
       console.error("custom-llm error", err);
       reply = "Sorry, I didn't catch that — could you say it again?";
@@ -170,14 +172,22 @@ export function createServer() {
       res.setHeader("Connection", "keep-alive");
       const chunk = (delta: object, finish: string | null) =>
         `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+      // The reply always goes first and unchanged, so the farewell (or "putting
+      // you through") is spoken before the line moves. On an ordinary turn
+      // nothing below this fires and the frames are exactly what we sent before.
       res.write(chunk({ role: "assistant", content: reply }, null));
       res.write(chunk({}, "stop"));
+      if (control) res.write(`data: ${JSON.stringify(control)}\n\n`);
       res.write("data: [DONE]\n\n");
       return res.end();
     }
     res.json({
       id, object: "chat.completion", created, model,
-      choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: reply, ...(control ?? {}) },
+        finish_reason: "stop",
+      }],
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
     });
   });
@@ -192,6 +202,20 @@ export function createServer() {
         provider: "custom-llm",
         url: `${env.publicBaseUrl}/api/vapi/chat/completions`,
         model: env.model,
+        // Vapi only honours endCall/transferCall if the assistant declares them.
+        // Without these two entries the agent can ask to hang up or connect the
+        // caller all it likes and nothing happens on the line.
+        tools: [
+          { type: "endCall" },
+          {
+            type: "transferCall",
+            destinations: [{
+              type: "number",
+              number: business.phoneForHumans.replace(/[^\d+]/g, ""),
+              message: "Connecting you now — one moment.",
+            }],
+          },
+        ],
       },
       voice: env.elevenLabsVoiceId
         ? { provider: "11labs", voiceId: env.elevenLabsVoiceId }
@@ -256,6 +280,36 @@ export function createServer() {
   app.get("/", (_req, res) => res.sendFile(resolve(__dirname, "../public/demo.html")));
 
   return app;
+}
+
+/**
+ * Vapi's built-in call controls are triggered by a `function_call` payload
+ * naming one of its own functions — not by our booking tools, which go over the
+ * separate /api/vapi/function webhook. Shape per Vapi's custom-LLM tool-calling
+ * docs.
+ */
+export type VapiControl = { function_call: { name: string; arguments: Record<string, unknown> } } | null;
+
+/**
+ * Decide whether this turn should move or close the line.
+ *
+ * Returns null unless VOICE_CALL_CONTROL is on, so the default deployment sends
+ * byte-identical frames to what it sends today and the flag is the whole
+ * rollback story. `transfer` wins over `ended`: connecting a caller who asked
+ * for a person matters more than hanging up tidily.
+ */
+export function callControlFor(
+  out: { transfer?: { number: string }; ended?: boolean }, body: any = {},
+): VapiControl {
+  if (!env.callControl) return null;
+  if (out.transfer) {
+    // Vapi passes the configured destination on the request; fall back to the
+    // business's own human line so a missing config still reaches someone.
+    const destination = body?.destination ?? out.transfer.number ?? business.phoneForHumans;
+    return { function_call: { name: "transferCall", arguments: { destination } } };
+  }
+  if (out.ended) return { function_call: { name: "endCall", arguments: {} } };
+  return null;
 }
 
 function parseArgs(raw: unknown): Record<string, unknown> {
