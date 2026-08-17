@@ -18,6 +18,12 @@ export interface BusinessConfig {
   faq: { q: string; a: string }[];
   escalation: { toHumanWhen: string[] };
   sampleQuestions?: string[];
+  /**
+   * What a good call looks like for this business, in one line — e.g. "book a
+   * free demo". Drives the agent's sense of purpose; without it the agent is a
+   * polite question-answerer that never asks for anything.
+   */
+  objective?: string;
 }
 
 /**

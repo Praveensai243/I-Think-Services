@@ -145,9 +145,15 @@ export function createServer() {
     if (!history.length) history.push({ role: "user", content: "Hello" });
 
     const callId = body?.call?.id ?? body?.metadata?.call?.id ?? "phone";
+    // Vapi knows who is calling — using it beats making them recite ten digits
+    // over a phone line that mangles them.
+    const call = body?.call ?? body?.metadata?.call ?? {};
+    const callerPhone: string | undefined =
+      call?.customer?.number ?? call?.from ?? body?.customer?.number ?? undefined;
+
     let reply = "…";
     try {
-      const out = await runAgent(history, "vapi:" + callId, "phone");
+      const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
       reply = out.reply || "…";
     } catch (err) {
       console.error("custom-llm error", err);

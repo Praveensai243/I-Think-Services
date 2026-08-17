@@ -5,6 +5,7 @@
   "phoneForHumans": "+1 (704) 387-9775",
   "greeting": "Thanks for calling I Think Services, this is Ava. Are you looking to add an AI receptionist or automate something in your business?",
   "agentName": "Ava",
+  "objective": "book the caller a free AI demo and audit",
   "hours": {
     "mon": ["09:00", "18:00"],
     "tue": ["09:00", "18:00"],
