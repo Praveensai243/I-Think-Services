@@ -9,7 +9,7 @@ import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
-import { emailEnabled } from "./notify.js";
+import { emailEnabled, sendTestEmail } from "./notify.js";
 import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -282,6 +282,16 @@ export function createServer() {
       });
     }
     res.json({ calendar: calendarLabel(), ...(await checkGoogleAccess()) });
+  });
+
+  /**
+   * Proves message alerts work without placing a call and leaving a message.
+   * Returns the mail server's own error, since "Invalid login" (wrong app
+   * password) and a TLS complaint (wrong port) need different fixes.
+   */
+  app.get("/api/admin/test-email", requireAdmin, async (_req, res) => {
+    const result = await sendTestEmail();
+    res.status(result.ok ? 200 : 500).json(result);
   });
 
   app.get("/api/admin/data", requireAdmin, (_req, res) => {

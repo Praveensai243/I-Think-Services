@@ -42,3 +42,36 @@ test("a missing callback number is stated plainly rather than left blank", () =>
   assert.match(text, /Callback: not given/);
   assert.match(text, /website/);
 });
+
+// ── proving it works without placing a call ────────────────────────
+// The real send is fire-and-forget so it can never delay a caller, which also
+// means a wrong password is invisible until a message has been lost. This one
+// is awaited and reports what the mail server actually said.
+
+import { sendTestEmail } from "../src/notify.js";
+
+test("an unconfigured mailer names the variables that are missing", async () => {
+  const r = await sendTestEmail();
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /SMTP_HOST/);
+  assert.match(r.detail, /NOTIFY_EMAIL/);
+  assert.doesNotMatch(r.detail, /undefined|\[object/, "must read as instructions, not a dump");
+});
+
+test("the test send never throws, whatever the mail server does", async () => {
+  const prev = { ...process.env };
+  Object.assign(process.env, {
+    SMTP_HOST: "127.0.0.1", SMTP_PORT: "1", SMTP_USER: "u",
+    SMTP_PASS: "p", NOTIFY_EMAIL: "someone@example.com",
+  });
+  try {
+    const r = await sendTestEmail();
+    assert.equal(r.ok, false);
+    assert.ok(r.detail.length > 0, "the provider's own words are what make this fixable");
+  } finally {
+    for (const k of ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "NOTIFY_EMAIL"]) {
+      if (prev[k] === undefined) delete process.env[k];
+      else process.env[k] = prev[k];
+    }
+  }
+});

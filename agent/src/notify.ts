@@ -75,3 +75,42 @@ export function notifyNewMessage(note: MessageNote, source: "web" | "phone"): vo
     .then(() => console.log("message emailed:", subject))
     .catch((err) => console.error("could not email the message:", err));
 }
+
+/**
+ * Sends a test alert and reports what actually happened.
+ *
+ * Configuration errors here are invisible otherwise: the real path never
+ * blocks a call, so a wrong password just leaves a line in the logs that
+ * nobody sees until a caller's message has already been lost. This one is
+ * awaited and returns the provider's own error text, because "it didn't work"
+ * has cost this project enough time already.
+ */
+export async function sendTestEmail(): Promise<{ ok: boolean; detail: string }> {
+  if (!emailEnabled()) {
+    const missing = [
+      !env.smtp.host && "SMTP_HOST",
+      !env.smtp.user && "SMTP_USER",
+      !env.smtp.pass && "SMTP_PASS",
+      !env.smtp.to && "NOTIFY_EMAIL",
+    ].filter(Boolean);
+    return { ok: false, detail: `Not configured yet — still missing: ${missing.join(", ")}` };
+  }
+  try {
+    await getTransport().sendMail({
+      from: env.smtp.from || env.smtp.user,
+      to: env.smtp.to,
+      subject: `Test alert from ${business.agentName}`,
+      text: [
+        "If you are reading this, message alerts are working.",
+        "",
+        `A real one arrives the moment a caller leaves a message with ${business.agentName},`,
+        "with their name, number and what they said.",
+      ].join("\n"),
+    });
+    return { ok: true, detail: `Sent to ${env.smtp.to}. Check that inbox, including spam.` };
+  } catch (err) {
+    // Verbatim: "Invalid login" means a wrong app password, "self signed
+    // certificate" means the wrong port, and guessing between them wastes a day.
+    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
