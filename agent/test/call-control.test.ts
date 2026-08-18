@@ -294,3 +294,30 @@ test("the trail is capped so a long call cannot grow it without bound", () => {
   }
   assert.ok(getCallEvents().length <= 50, "ring buffer must stay bounded");
 });
+
+// ── telling the failures apart ─────────────────────────────────────
+// "count: 0" had several possible meanings and the endpoint could not
+// distinguish them, which is why three debugging rounds produced no answer.
+
+import { diagnose } from "../src/server.js";
+
+test("no requests at all points at the Vapi assistant, not at this code", () => {
+  const d = diagnose(0, { hits: 0, authRejected: 0 });
+  assert.match(d, /not pointed at this server/);
+  assert.match(d, /Custom LLM/);
+});
+
+test("every request rejected points at the shared secret", () => {
+  const d = diagnose(0, { hits: 7, authRejected: 7 });
+  assert.match(d, /VAPI_SECRET/);
+});
+
+test("requests arriving but no turns completing points at a thrown error", () => {
+  const d = diagnose(0, { hits: 5, authRejected: 0 });
+  assert.match(d, /custom-llm error/);
+});
+
+test("healthy traffic sends the reader to the tool list", () => {
+  const d = diagnose(12, { hits: 12, authRejected: 0 });
+  assert.match(d, /toolsFromVapi/);
+});

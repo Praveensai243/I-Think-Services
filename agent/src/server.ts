@@ -9,7 +9,7 @@ import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
-import { recordCallEvent, getCallEvents, short } from "./diag.js";
+import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -122,10 +122,19 @@ export function createServer() {
   // agent (prompt + booking tools) and reply. This makes the Vapi setup a
   // one-URL affair — no tools or model keys to configure on their side.
   app.post("/api/vapi/chat/completions", async (req, res) => {
+    // Counted BEFORE the auth check on purpose. Everything else in this handler
+    // records only after a request is accepted, so a rejected one used to leave
+    // no trace — making "nothing reached us" and "we turned it away" look
+    // identical from the outside. They need very different fixes.
+    recordEndpointHit();
     if (env.vapiSecret) {
       const bearer = (req.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       const tok = bearer || req.get("x-vapi-secret");
-      if (tok !== env.vapiSecret) return res.status(401).json({ error: "unauthorized" });
+      if (tok !== env.vapiSecret) {
+        recordAuthRejection(Boolean(bearer || req.get("x-vapi-secret")));
+        console.error("custom-llm 401: VAPI_SECRET is set here but the request did not match it");
+        return res.status(401).json({ error: "unauthorized" });
+      }
     }
     const body = req.body ?? {};
     const incoming: any[] = Array.isArray(body.messages) ? body.messages : [];
@@ -279,10 +288,12 @@ export function createServer() {
    */
   app.get("/api/admin/diagnostics", requireAdmin, (_req, res) => {
     const events = getCallEvents();
+    const counters = getCounters();
     res.json({
-      note: events.length
-        ? "Newest first. toolsFromVapi lists what the Vapi assistant declares."
-        : "No turns recorded since the last restart — if you just called, Vapi never reached this server.",
+      diagnosis: diagnose(events.length, counters),
+      requestsToThisEndpoint: counters.hits,
+      rejectedForBadSecret: counters.authRejected,
+      secretRequiredHere: Boolean(env.vapiSecret),
       controlEnabled: env.callControl,
       count: events.length,
       events,
@@ -372,6 +383,30 @@ export function sseFrames(
   frames.push(o.control ? `data: ${JSON.stringify(o.control)}\n\n` : chunk({}, "stop"));
   frames.push("data: [DONE]\n\n");
   return frames;
+}
+
+/**
+ * Turns the counters into the one sentence worth reading. Zero requests and
+ * zero rejections means Vapi is not talking to this server at all, which no
+ * change to this codebase can fix.
+ */
+export function diagnose(turns: number, c: { hits: number; authRejected: number }): string {
+  if (c.hits === 0) {
+    return "Nothing has reached this endpoint since the last restart. If you have called since then, "
+      + "the Vapi assistant is not pointed at this server — check that its model provider is Custom LLM "
+      + "with url .../api/vapi/chat/completions. Until that is true, no change to this code affects a call.";
+  }
+  if (c.authRejected === c.hits) {
+    return "Every request was rejected: VAPI_SECRET is set on this server but Vapi is not sending a "
+      + "matching one. Either paste the same value as the custom-LLM API key in Vapi, or clear "
+      + "VAPI_SECRET here.";
+  }
+  if (turns === 0) {
+    return "Requests arrived but no turn completed — the agent threw before replying. Check the host logs "
+      + "for 'custom-llm error'.";
+  }
+  return "Requests are arriving and turns are completing. Read toolsFromVapi below: if it is empty, the "
+    + "Vapi assistant has no endCall/transferCall tools configured and cannot act on ours.";
 }
 
 /**

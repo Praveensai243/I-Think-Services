@@ -40,3 +40,24 @@ export function short(text: unknown, max = 160): string {
   const t = String(text ?? "").replace(/\s+/g, " ").trim();
   return t.length > max ? t.slice(0, max) + "…" : t;
 }
+
+/**
+ * Counters for the endpoint itself, kept separately from turns because they
+ * answer a different question: not "what did the agent decide" but "did Vapi
+ * even get here". A rejected request never reaches the turn recorder.
+ */
+const counters = { hits: 0, authRejected: 0 };
+
+export function recordEndpointHit(): void {
+  counters.hits++;
+}
+
+/** @param sentSomething whether a secret was presented at all, vs none sent. */
+export function recordAuthRejection(sentSomething: boolean): void {
+  counters.authRejected++;
+  if (!sentSomething) console.error("custom-llm 401: Vapi sent no secret at all");
+}
+
+export function getCounters(): { hits: number; authRejected: number } {
+  return { ...counters };
+}
