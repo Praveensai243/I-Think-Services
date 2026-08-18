@@ -10,7 +10,7 @@ import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
 import { emailEnabled, sendTestEmail } from "./notify.js";
-import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath } from "./diag.js";
+import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath, uptimeSeconds } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -315,7 +315,7 @@ export function createServer() {
     const events = getCallEvents();
     const counters = getCounters();
     res.json({
-      diagnosis: diagnose(events.length, counters),
+      diagnosis: diagnose(events.length, { ...counters, uptime: uptimeSeconds() }),
       requestsToThisEndpoint: counters.hits,
       wrongPathsTried: counters.wrongPaths,
       rejectedForBadSecret: counters.authRejected,
@@ -507,12 +507,19 @@ export function sseFrames(
  * zero rejections means Vapi is not talking to this server at all, which no
  * change to this codebase can fix.
  */
-export function diagnose(turns: number, c: { hits: number; authRejected: number; wrongPaths?: string[] }): string {
+export function diagnose(turns: number, c: { hits: number; authRejected: number; wrongPaths?: string[]; uptime?: number }): string {
   const wrong = c.wrongPaths ?? [];
   if (c.hits === 0 && wrong.length > 0) {
     return "Vapi is reaching this server but calling the wrong path: " + wrong.join(", ")
       + ". The Custom LLM URL in Vapi must be the BASE url — Vapi appends /chat/completions itself, so "
       + "pasting the full path doubles it.";
+  }
+  if (c.hits === 0 && (c.uptime ?? Infinity) < 15 * 60) {
+    // A deploy restarts the process and clears the trail, so an empty one
+    // shortly afterwards means nobody has called yet — not that the config
+    // broke. Saying otherwise sends people to fix something that is fine.
+    return `No calls yet since this server restarted ${Math.max(1, Math.round((c.uptime ?? 0) / 60))} `
+      + "minute(s) ago — that is expected right after a deploy. Place a call, then reload this page.";
   }
   if (c.hits === 0) {
     return "Nothing has reached this endpoint since the last restart. If you have called since then, "

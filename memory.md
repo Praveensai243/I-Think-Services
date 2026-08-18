@@ -71,31 +71,75 @@ smarts), `ADMIN_TOKEN`, `PUBLIC_BASE_URL` (= the Render URL), `CALENDAR`, `GOOGL
 23-topic AI-services knowledge); admin dashboard; usage tracking; Stripe billing
 (keyless-safe/off until keys added); multi-client configs; the custom-LLM brain.
 
-**THE PHONE — LIVE ✅ (first real calls 2026-08-13/14).** Vapi assistant → Model provider
-**Custom LLM** → `https://ithink-ai-agent.onrender.com/api/vapi/chat/completions` → voice →
-number. Vapi carries **no** Anthropic key (our backend is the brain). Keep Render on
-**Starter** (a sleeping Free instance drops the first call); `VAPI_SECRET` pastes in as the
-custom-LLM "API key"; assistant Server URL = `/api/vapi/function` to capture billable minutes.
+**THE PHONE — WORKING END TO END ✅ (2026-08-18).** Answers, knows the business, books to
+the real calendar, transfers to a human, and hangs up when the caller signs off.
 
-**What the live calls exposed (this is the current work):**
-1. **Latency** — the caller waits for Claude to finish the whole reply before hearing a
-   word. Still unfixed; see the #10 post-mortem below.
-2. **Digit capture** — the agent could not get a phone number right (ten repeats, still
-   wrong). Root cause is the cheap transcriber, not the prompt.
-3. **Fumbled its own FAQ** — `answer_faq` matched by substring, so *"how much does it
-   cost"* never reached the entry keyed `pricing`.
+**⚠️ Vapi's Custom LLM URL is a BASE url.** Vapi appends `/chat/completions` itself. The
+field must read `https://ithink-ai-agent.onrender.com/api/vapi` — pasting the full endpoint
+makes Vapi call `/chat/completions/chat/completions`, which 404s before reaching any
+handler. This cost most of a day: the backend looked idle and innocent while every call
+failed, and several rounds of "fixes" went into code that was never executing. Unknown
+paths under `/api/vapi` now 404 with an explanation instead of silently.
 
-**⚠️ #10 post-mortem — a silent phone (read before touching the voice path):**
-PR #10 shipped SSE token streaming **and** an `end_call` tool together. On deploy the phone
-went **completely silent** — no greeting, no response to speech. Reverted same day (#11);
-production is back on the slow-but-working single-chunk SSE. **The cause was never
-diagnosed** — and because the two changes shipped as one commit, we still don't know which
-one caused it. Diagnose from Render logs first, and put them back **separately**.
+**Vapi assistant config that has to be right (none of it is code):**
+- Model provider **Custom LLM**, URL as above. No Anthropic key on Vapi's side.
+- Tools tab must declare **endCall** and **transferCall**, or the agent can ask to hang up
+  and transfer all it likes and nothing happens on the line.
+- The transfer destination must be a **different, real, answerable phone** — never the
+  number the assistant itself answers. A call cannot be transferred to its own line.
+- Fill the transfer tool's **"Message to Customer"**; we deliberately send no words of our
+  own on a transfer turn (see below), so that field is what the caller hears.
+- Transcriber: Deepgram Nova 2 Phonecall. First Message: the real greeting, not "Hello."
 
-**Next up:** PR #12 (caller-ID read-back, chunked digits, FAQ inlined into the prompt,
-per-call `objective`) — rebased onto main, conflict-free, typecheck clean, 13/13 tests,
-**ready to merge**. Deliberately touches no SSE transport code. After it merges, switch the
-Vapi transcriber to **Deepgram Nova** (console work, fixes misheard digits at the source).
+**Talking to Vapi — three rules learned the hard way:**
+1. **Tool names come from the dashboard**, e.g. `transfer_call_tool`, not `transferCall`.
+   We read the name back out of the request Vapi sends rather than assuming it.
+2. **Send the ordinary OpenAI `tool_calls` delta**, closed by `finish_reason: "tool_calls"`,
+   arguments as a JSON *string*. Not the bare `function_call` frame from Vapi's proxy
+   example. The control frame REPLACES the stop; a frame after a stop is ignored or fatal.
+3. **A transfer carries no text of ours.** A message with `content` reads as a finished
+   answer and its `tool_calls` never get read. `endCall` keeps its text — the farewell has
+   to come from us and Vapi has no field for it.
+
+**A failed transfer is not quiet: Vapi ENDS THE CALL.** Every "it hung up on me" during
+debugging was a transfer failing. That one behaviour makes every possible cause look
+identical from the handset, which is why this took several rounds. The dashboard's fallback
+message does not help — Vapi only fires it on SIP transfers.
+
+**Switches, all live without a redeploy (read per request):**
+`VOICE_CALL_CONTROL` (transfer + hang-up; the kill switch), `VAPI_CONTROL_SHAPE`
+(`tool_calls` default / `function_call`), `VAPI_CONTROL_SPEAKS` (`vapi` default / `agent`).
+
+**Diagnostics — use these before theorising:**
+- `/api/admin/diagnostics?token=…` — last 50 turns: what the caller said, what the agent
+  decided, what we sent Vapi, and **the tool list Vapi declared**. Leads with a plain-words
+  diagnosis. Request counting happens *before* auth, so "nothing arrived" and "we rejected
+  it" are distinguishable.
+- `/api/admin/test-email?token=…` — sends a real test alert and returns the mail server's
+  own error.
+- `/api/admin/calendar-check?token=…` — proves the calendar wiring.
+
+**Message alerts — LIVE ✅.** `take_message` emails the team immediately (name, number,
+what they said; number in the subject so it is readable from a lock screen). Any SMTP
+provider: `SMTP_HOST/PORT/USER/PASS/FROM` + `NOTIFY_EMAIL`. Keyless-safe — with nothing
+configured it logs and the call still completes. This email is also the only durable copy
+of a message until there is a database.
+
+**Guards that live in code, not in the prompt.** Each was added after a prompt rule failed
+on a live call — Haiku is fast but does not reliably honour a negative instruction buried
+in a long prompt:
+- Never hang up unless the caller's own last words were a sign-off. A question is never a
+  goodbye.
+- Connect a caller who asks for a person twice, immediately, whatever the agent decided.
+- Never transfer to an undialable number, or to the line the call is already on.
+
+**Still open:**
+1. **Latency** — the caller waits for the whole reply before hearing a word. The #10
+   post-mortem below still applies. **Prompt caching is the cheaper first move**: the system
+   prompt (~3.4k tokens) is byte-identical every turn.
+2. **Everything is in memory** (`store.ts`, `usage.ts`) — bookings, messages, transfers and
+   **billable minutes all reset on every deploy**. Cannot invoice a client yet.
+3. Digit capture still leans on the transcriber.
 
 **Calendar — LIVE ✅ (real Google Calendar, verified 2026-08-13):**
 - Bookings write to **contact@ithinkservices.net**'s calendar; availability comes from its

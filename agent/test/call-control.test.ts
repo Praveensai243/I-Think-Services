@@ -625,3 +625,27 @@ test("an ordinary turn always speaks, whoever is set to speak on control", () =>
     });
   }
 });
+
+// ── an empty trail right after a deploy is not a fault ─────────────
+// A deploy restarts the process and clears the trail. Reporting that as "the
+// assistant is not pointed at this server" sends someone to re-fix a setting
+// that is already correct — which happened.
+
+test("no calls yet after a restart reads as expected, not broken", () => {
+  const d = diagnose(0, { hits: 0, authRejected: 0, uptime: 90 });
+  assert.match(d, /expected right after a deploy/);
+  assert.doesNotMatch(d, /not pointed at this server/);
+});
+
+test("an empty trail on a long-running server still accuses the config", () => {
+  const d = diagnose(0, { hits: 0, authRejected: 0, uptime: 6 * 60 * 60 });
+  assert.match(d, /not pointed at this server/);
+});
+
+test("a wrong path is named even on a fresh restart", () => {
+  const d = diagnose(0, {
+    hits: 0, authRejected: 0, uptime: 30,
+    wrongPaths: ["/api/vapi/chat/completions/chat/completions"],
+  });
+  assert.match(d, /wrong path/, "a real fault outranks the restart explanation");
+});
