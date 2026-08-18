@@ -353,6 +353,26 @@ export type VapiControl = { function_call: { name: string; arguments: Record<str
  * rollback story. `transfer` wins over `ended`: connecting a caller who asked
  * for a person matters more than hanging up tidily.
  */
+/**
+ * The name Vapi will recognise for one of its built-ins.
+ *
+ * Tools are named by whoever created them in the dashboard —
+ * "transfer_call_tool", not "transferCall" — and that name is what arrives in
+ * the request and what Vapi matches our reply against. Emitting the canonical
+ * name matched nothing. So read the name back out of the request Vapi just
+ * sent, and only fall back to the canonical one when it declared no such tool.
+ */
+export function vapiToolName(body: any, kind: "transferCall" | "endCall"): string {
+  const tools = Array.isArray(body?.tools) ? body.tools : [];
+  const want = kind === "transferCall" ? /transfer/i : /end.?call|hang.?up/i;
+  for (const t of tools) {
+    const name = t?.function?.name;
+    if (typeof name === "string" && (name === kind || want.test(name))) return name;
+    if (t?.type === kind) return kind;
+  }
+  return kind;
+}
+
 export function callControlFor(
   out: { transfer?: { number: string }; ended?: boolean },
   body: any = {},
@@ -371,7 +391,7 @@ export function callControlFor(
       console.error("transfer skipped; destination is not dialable:", JSON.stringify(raw));
       return null;
     }
-    return { function_call: { name: "transferCall", arguments: { destination } } };
+    return { function_call: { name: vapiToolName(body, "transferCall"), arguments: { destination } } };
   }
   if (out.ended) {
     if (!callerIsLeaving(lastCallerText)) {
@@ -382,7 +402,7 @@ export function callControlFor(
       console.warn("suppressed end_call; caller had not signed off:", JSON.stringify(lastCallerText.slice(0, 120)));
       return null;
     }
-    return { function_call: { name: "endCall", arguments: {} } };
+    return { function_call: { name: vapiToolName(body, "endCall"), arguments: {} } };
   }
   return null;
 }
@@ -408,7 +428,35 @@ export function sseFrames(
   // The reply always goes first, so the farewell (or "putting you through") is
   // spoken before the line moves.
   const frames = [chunk({ role: "assistant", content: o.reply }, null)];
-  frames.push(o.control ? `data: ${JSON.stringify(o.control)}\n\n` : chunk({}, "stop"));
+
+  if (!o.control) {
+    frames.push(chunk({}, "stop"));
+    frames.push("data: [DONE]\n\n");
+    return frames;
+  }
+
+  if (env.controlShape === "function_call") {
+    // Vapi's proxy example writes this bare frame. Kept switchable because it
+    // is what we shipped first and the docs show both.
+    frames.push(`data: ${JSON.stringify(o.control)}\n\n`);
+  } else {
+    // Default. Vapi hands us its built-ins as OpenAI function definitions
+    // ({type:"function",function:{name:"transferCall"}}), so the reply it is
+    // parsing for is the ordinary OpenAI tool call: a tool_calls delta closed
+    // by finish_reason "tool_calls". Arguments must be a JSON *string*.
+    frames.push(chunk({
+      tool_calls: [{
+        index: 0,
+        id: "call_" + o.control.function_call.name,
+        type: "function",
+        function: {
+          name: o.control.function_call.name,
+          arguments: JSON.stringify(o.control.function_call.arguments ?? {}),
+        },
+      }],
+    }, null));
+    frames.push(chunk({}, "tool_calls"));
+  }
   frames.push("data: [DONE]\n\n");
   return frames;
 }
@@ -469,7 +517,9 @@ export function logCallControlDiagnostics(
     agentSaid: short(agentSaid),
     decided: { transfer: out.transfer?.number, ended: out.ended },
     sentToVapi: control,
-    toolsFromVapi: tools.map((t: any) => t?.type ?? t?.function?.name ?? "?"),
+    // The name first: Vapi sends built-ins as {type:"function",function:{name}},
+    // so reading `type` first showed "function" three times and hid the answer.
+    toolsFromVapi: tools.map((t: any) => t?.function?.name ?? t?.type ?? "?"),
     destinationFromVapi: body?.destination ?? null,
     controlEnabled: env.callControl,
     streaming: Boolean(body?.stream),

@@ -235,9 +235,11 @@ test("an ordinary turn ends with stop, exactly as before", () => {
 });
 
 test("a control frame replaces the stop instead of following it", () => {
+  // Shape-agnostic: whichever framing is in use, a turn that moves the line
+  // must never also declare itself finished with a plain stop.
   const f = sseFrames({ ...base, control: { function_call: { name: "endCall", arguments: {} } } });
   const body = f.join("");
-  assert.match(body, /"function_call"/);
+  assert.match(body, /endCall/);
   assert.doesNotMatch(body, /"finish_reason":"stop"/, "stop must not accompany a control frame");
 });
 
@@ -246,9 +248,9 @@ test("the spoken reply is always sent before the line is moved", () => {
     ...base, reply: "Putting you through now.",
     control: { function_call: { name: "transferCall", arguments: { destination: "+17043879775" } } },
   });
-  assert.match(f[0], /Putting you through now\./);
-  assert.match(f[1], /transferCall/);
-  assert.equal(f[2], "data: [DONE]\n\n");
+  assert.match(f[0], /Putting you through now\./, "the farewell must be spoken first");
+  assert.ok(f.slice(1).some((x) => x.includes("transferCall")), "the control must follow the reply");
+  assert.equal(f.at(-1), "data: [DONE]\n\n");
 });
 
 // ── the diagnostics trail ──────────────────────────────────────────
@@ -403,4 +405,115 @@ test("ordinary conversation is never mistaken for wanting a human", () => {
   ];
   assert.equal(callerInsistsOnHuman(history), false,
     "these mention people but are not requests to be transferred");
+});
+
+// ── the shape Vapi actually parses ─────────────────────────────────
+// Vapi hands us its built-ins as OpenAI function definitions
+// ({type:"function",function:{name:"transferCall"}}), so the reply it parses
+// for is the ordinary OpenAI tool call, not the bare function_call frame from
+// the proxy example in their docs. Kept switchable by env because a live call
+// is the only thing that can settle it.
+
+function withShape<T>(shape: string, fn: () => T): T {
+  const prev = process.env.VAPI_CONTROL_SHAPE;
+  process.env.VAPI_CONTROL_SHAPE = shape;
+  try { return fn(); } finally {
+    if (prev === undefined) delete process.env.VAPI_CONTROL_SHAPE;
+    else process.env.VAPI_CONTROL_SHAPE = prev;
+  }
+}
+
+const transfer = {
+  function_call: { name: "transferCall", arguments: { destination: "+17043879775" } },
+};
+
+test("by default a transfer is an ordinary OpenAI tool call", () => {
+  withShape("", () => {
+    const body = sseFrames({ ...base, control: transfer }).join("");
+    assert.match(body, /"tool_calls"/);
+    assert.match(body, /"finish_reason":"tool_calls"/);
+    assert.match(body, /"name":"transferCall"/);
+  });
+});
+
+test("tool call arguments are a JSON string, as OpenAI specifies", () => {
+  withShape("", () => {
+    const frames = sseFrames({ ...base, control: transfer });
+    const toolFrame = frames.find((f) => f.includes("tool_calls") && f.includes("transferCall"))!;
+    const parsed = JSON.parse(toolFrame.replace(/^data: /, ""));
+    const args = parsed.choices[0].delta.tool_calls[0].function.arguments;
+    assert.equal(typeof args, "string", "arguments must be a string, not an object");
+    assert.deepEqual(JSON.parse(args), { destination: "+17043879775" });
+  });
+});
+
+test("the old bare frame is still reachable without a deploy", () => {
+  withShape("function_call", () => {
+    const body = sseFrames({ ...base, control: transfer }).join("");
+    assert.match(body, /"function_call"/);
+    assert.doesNotMatch(body, /"tool_calls"/);
+  });
+});
+
+test("an ordinary turn is unaffected by the shape setting", () => {
+  for (const shape of ["", "function_call", "tool_calls"]) {
+    withShape(shape, () => {
+      const body = sseFrames({ ...base, control: null }).join("");
+      assert.match(body, /"finish_reason":"stop"/);
+      assert.doesNotMatch(body, /tool_calls|function_call/);
+    });
+  }
+});
+
+// ── matching the name Vapi actually declared ───────────────────────
+// From the dashboard: the tools are named "transfer_call_tool" and
+// "end_call_tool", not "transferCall" and "endCall". We were emitting the
+// canonical names, which matched nothing Vapi had.
+
+import { vapiToolName } from "../src/server.js";
+
+const asDeclared = {
+  tools: [
+    { type: "function", function: { name: "google_calendar_tool" } },
+    { type: "function", function: { name: "transfer_call_tool" } },
+    { type: "function", function: { name: "end_call_tool" } },
+  ],
+};
+
+test("the dashboard's own tool names are used, not the canonical ones", () => {
+  assert.equal(vapiToolName(asDeclared, "transferCall"), "transfer_call_tool");
+  assert.equal(vapiToolName(asDeclared, "endCall"), "end_call_tool");
+});
+
+test("canonical names still match when that is what Vapi sent", () => {
+  const canonical = {
+    tools: [
+      { type: "function", function: { name: "transferCall" } },
+      { type: "function", function: { name: "endCall" } },
+    ],
+  };
+  assert.equal(vapiToolName(canonical, "transferCall"), "transferCall");
+  assert.equal(vapiToolName(canonical, "endCall"), "endCall");
+});
+
+test("with no tools declared we fall back to the canonical name", () => {
+  assert.equal(vapiToolName({}, "transferCall"), "transferCall");
+  assert.equal(vapiToolName({ tools: [] }, "endCall"), "endCall");
+});
+
+test("an unrelated tool is never mistaken for a call control", () => {
+  const onlyCalendar = { tools: [{ type: "function", function: { name: "google_calendar_tool" } }] };
+  assert.equal(vapiToolName(onlyCalendar, "transferCall"), "transferCall", "falls back, not the calendar");
+  assert.equal(vapiToolName(onlyCalendar, "endCall"), "endCall");
+});
+
+test("the emitted transfer carries the declared name end to end", () => {
+  withCallControl(true, () => {
+    const control = callControlFor(
+      { transfer: { number: "+17043879775" } }, asDeclared, "please transfer me",
+    );
+    assert.equal(control?.function_call.name, "transfer_call_tool");
+    const body = sseFrames({ ...base, control }).join("");
+    assert.match(body, /"name":"transfer_call_tool"/);
+  });
 });
