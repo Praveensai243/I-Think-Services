@@ -357,3 +357,50 @@ test("an unknown /api/vapi path returns a hint instead of a bare 404", async () 
   assert.match(body.hint, /base URL/i);
   assert.equal(body.youCalled, "/api/vapi/chat/completions/chat/completions");
 });
+
+// ── stalling a caller who wants a person ───────────────────────────
+// From the first call that actually reached this backend: the caller asked to
+// be transferred four times while the agent kept qualifying them. Being
+// helpful first is right; using it to stall someone is how you lose the call.
+
+import { callerInsistsOnHuman } from "../src/server.js";
+
+const user = (content: string) => ({ role: "user", content });
+const bot = (content: string) => ({ role: "assistant", content });
+
+test("one request for a person is not yet insistence", () => {
+  assert.equal(callerInsistsOnHuman([user("can you transfer me to someone?")]), false,
+    "a single ask leaves room for one clarifying question");
+});
+
+test("asking twice forces the transfer", () => {
+  // The real transcript, condensed.
+  const history = [
+    user("Hey. Hi. Can you please transfer the call to someone?"),
+    bot("Of course! Can you tell me what's going on?"),
+    user("I need some help with a HVAC business."),
+    bot("Before I transfer you, what specific question do you have?"),
+    user("I have some customer requirements. So I'd like to speak to someone."),
+  ];
+  assert.equal(callerInsistsOnHuman(history), true);
+});
+
+test("the forced transfer produces a real dialable control", () => {
+  withCallControl(true, () => {
+    const control = callControlFor(
+      { transfer: { number: business.phoneForHumans } }, {}, "please transfer the call",
+    );
+    assert.equal(control?.function_call.name, "transferCall");
+    assert.match(String(control?.function_call.arguments.destination), /^\+\d{11,15}$/);
+  });
+});
+
+test("ordinary conversation is never mistaken for wanting a human", () => {
+  const history = [
+    user("do you have someone available Tuesday?"),
+    bot("Let me check."),
+    user("what does a real receptionist cost by comparison?"),
+  ];
+  assert.equal(callerInsistsOnHuman(history), false,
+    "these mention people but are not requests to be transferred");
+});
