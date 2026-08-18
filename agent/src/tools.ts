@@ -3,6 +3,7 @@ import { business } from "./config.js";
 import { getAvailability, book, reschedule, cancel } from "./calendar.js";
 import { messageLog, handoffLog, bookingLog } from "./store.js";
 import { recordAction } from "./usage.js";
+import { notifyNewMessage } from "./notify.js";
 
 /**
  * Tool definitions shared by BOTH surfaces:
@@ -174,12 +175,15 @@ export async function runTool(
       return { ok: true };
     }
     case "take_message": {
-      messageLog.push({
+      const note = {
         name: String(input.name), phone: input.phone ? String(input.phone) : undefined,
         message: String(input.message), at: new Date().toISOString(), sessionId,
-      });
+      };
+      messageLog.push(note);
       recordAction("take_message", true);
-      return { ok: true };
+      // Not awaited: an SMTP round trip would be heard as silence on the phone.
+      notifyNewMessage(note, source);
+      return { ok: true, note: "Message recorded and sent to the team." };
     }
     case "transfer_to_human": {
       handoffLog.unshift({ reason: String(input.reason ?? ""), at: new Date().toISOString(), sessionId });
