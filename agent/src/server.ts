@@ -160,6 +160,11 @@ export function createServer() {
     const call = body?.call ?? body?.metadata?.call ?? {};
     const callerPhone: string | undefined =
       call?.customer?.number ?? call?.from ?? body?.customer?.number ?? undefined;
+    // The number the caller dialled to reach us. Transferring a call to the
+    // line it arrived on fails instantly, and Vapi ends the call when a
+    // transfer fails — which is indistinguishable from a deliberate hang-up.
+    const dialedNumber: string | undefined =
+      call?.phoneNumber?.number ?? call?.phoneNumberId ?? call?.to ?? undefined;
 
     let reply = "…";
     let control: VapiControl = null;
@@ -174,7 +179,7 @@ export function createServer() {
         console.log("forcing transfer: caller asked for a person repeatedly");
         out.transfer = { number: business.phoneForHumans };
       }
-      control = callControlFor(out, body, lastCallerText(history));
+      control = callControlFor(out, body, lastCallerText(history), { dialedNumber, callerPhone });
       // Recorded on EVERY turn, not just ones that move the line. An empty
       // trail after a test call is itself the answer: it means Vapi never
       // reached this endpoint.
@@ -377,6 +382,7 @@ export function callControlFor(
   out: { transfer?: { number: string }; ended?: boolean },
   body: any = {},
   lastCallerText = "",
+  lines: { dialedNumber?: string; callerPhone?: string } = {},
 ): VapiControl {
   if (!env.callControl) return null;
   if (out.transfer) {
@@ -384,6 +390,17 @@ export function callControlFor(
     // business's own human line so a missing config still reaches someone.
     const raw = body?.destination?.number ?? body?.destination ?? out.transfer.number ?? business.phoneForHumans;
     const destination = toE164(raw);
+    // A line cannot be transferred to itself, and neither can a caller be
+    // transferred back to their own handset. Vapi answers both by ending the
+    // call, so refusing here keeps the caller talking to the agent instead.
+    const self = [lines.dialedNumber, lines.callerPhone].map(toE164).filter(Boolean);
+    if (destination && self.includes(destination)) {
+      console.error(
+        "transfer skipped; destination is the line the call is already on:", destination,
+        "— set the transfer destination to a different phone, e.g. a mobile.",
+      );
+      return null;
+    }
     if (!destination) {
       // A destination Vapi cannot dial makes it END the call, which is the
       // worst possible answer to "can I speak to a person?". Sending nothing
@@ -521,6 +538,7 @@ export function logCallControlDiagnostics(
     // so reading `type` first showed "function" three times and hid the answer.
     toolsFromVapi: tools.map((t: any) => t?.function?.name ?? t?.type ?? "?"),
     destinationFromVapi: body?.destination ?? null,
+    dialedNumber: body?.call?.phoneNumber?.number ?? body?.call?.to ?? null,
     controlEnabled: env.callControl,
     streaming: Boolean(body?.stream),
   };
