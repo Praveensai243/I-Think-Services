@@ -517,3 +517,51 @@ test("the emitted transfer carries the declared name end to end", () => {
     assert.match(body, /"name":"transfer_call_tool"/);
   });
 });
+
+// ── a call cannot be transferred to its own line ───────────────────
+// Suspected cause of the transfer that keeps ending the call: the business
+// number on the marketing site is also the number the assistant answers, so
+// transferring to it hands the call back to itself. Vapi answers a failed
+// transfer by ending the call, so this looks exactly like a hang-up.
+
+test("transferring to the number the caller dialled is refused", () => {
+  withCallControl(true, () => {
+    const control = callControlFor(
+      { transfer: { number: "+17043879775" } }, {}, "get me a person",
+      { dialedNumber: "+1 (704) 387-9775" },
+    );
+    assert.equal(control, null, "a line cannot be transferred to itself");
+  });
+});
+
+test("transferring a caller back to their own handset is refused", () => {
+  withCallControl(true, () => {
+    const control = callControlFor(
+      { transfer: { number: "+19995551234" } }, {}, "transfer me",
+      { callerPhone: "+19995551234" },
+    );
+    assert.equal(control, null);
+  });
+});
+
+test("a different destination transfers normally", () => {
+  withCallControl(true, () => {
+    const control = callControlFor(
+      { transfer: { number: "+19995551234" } }, {}, "transfer me",
+      { dialedNumber: "+17043879775", callerPhone: "+18885550000" },
+    );
+    assert.equal(control?.function_call.arguments.destination, "+19995551234");
+  });
+});
+
+test("the self-transfer check compares numbers, not their formatting", () => {
+  withCallControl(true, () => {
+    // Same line, written three ways — all must be caught.
+    for (const dialed of ["704-387-9775", "(704) 387 9775", "+1 704 387 9775"]) {
+      assert.equal(
+        callControlFor({ transfer: { number: "+17043879775" } }, {}, "transfer me", { dialedNumber: dialed }),
+        null, `missed self-transfer for: ${dialed}`,
+      );
+    }
+  });
+});

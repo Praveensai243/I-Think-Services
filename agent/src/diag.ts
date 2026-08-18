@@ -19,6 +19,8 @@ export interface CallEvent {
   sentToVapi: unknown;
   toolsFromVapi: string[];
   destinationFromVapi: unknown;
+  /** The number the caller dialled — if the transfer destination matches it, the transfer self-loops. */
+  dialedNumber?: unknown;
   controlEnabled: boolean;
   streaming: boolean;
 }
