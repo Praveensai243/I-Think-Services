@@ -9,7 +9,7 @@ import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
-import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters } from "./diag.js";
+import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -292,11 +292,31 @@ export function createServer() {
     res.json({
       diagnosis: diagnose(events.length, counters),
       requestsToThisEndpoint: counters.hits,
+      wrongPathsTried: counters.wrongPaths,
       rejectedForBadSecret: counters.authRejected,
       secretRequiredHere: Boolean(env.vapiSecret),
       controlEnabled: env.callControl,
       count: events.length,
       events,
+    });
+  });
+
+  /**
+   * Anything under /api/vapi that is not a real route. This exists because a
+   * misconfigured Custom LLM URL is otherwise completely silent: Vapi appends
+   * /chat/completions to the base URL you give it, so pasting the full path
+   * makes it call /chat/completions/chat/completions, which 404s before
+   * reaching any handler. Calls then fail with the backend looking idle and
+   * innocent. Recording the attempted path turns that into a visible answer.
+   */
+  app.all("/api/vapi/*", (req, res) => {
+    recordWrongPath(req.path);
+    console.error("vapi hit an unknown path:", req.path);
+    res.status(404).json({
+      error: "no_such_endpoint",
+      hint: "Vapi appends /chat/completions to the Custom LLM base URL. Set the base URL to "
+        + `${env.publicBaseUrl}/api/vapi — not the full path.`,
+      youCalled: req.path,
     });
   });
 
@@ -390,7 +410,13 @@ export function sseFrames(
  * zero rejections means Vapi is not talking to this server at all, which no
  * change to this codebase can fix.
  */
-export function diagnose(turns: number, c: { hits: number; authRejected: number }): string {
+export function diagnose(turns: number, c: { hits: number; authRejected: number; wrongPaths?: string[] }): string {
+  const wrong = c.wrongPaths ?? [];
+  if (c.hits === 0 && wrong.length > 0) {
+    return "Vapi is reaching this server but calling the wrong path: " + wrong.join(", ")
+      + ". The Custom LLM URL in Vapi must be the BASE url — Vapi appends /chat/completions itself, so "
+      + "pasting the full path doubles it.";
+  }
   if (c.hits === 0) {
     return "Nothing has reached this endpoint since the last restart. If you have called since then, "
       + "the Vapi assistant is not pointed at this server — check that its model provider is Custom LLM "
