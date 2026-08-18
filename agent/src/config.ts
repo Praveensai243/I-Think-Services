@@ -86,6 +86,19 @@ export const env = {
     pricePro: process.env.STRIPE_PRICE_PRO ?? "",
     portalReturnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? "",
   },
+  /**
+   * Where a caller's message gets sent. Any SMTP provider works — Gmail with an
+   * app password, Resend, SendGrid, Postmark. Unset means messages are logged
+   * only, which is the pre-configuration default rather than an error.
+   */
+  smtp: {
+    host: process.env.SMTP_HOST ?? "",
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER ?? "",
+    pass: process.env.SMTP_PASS ?? "",
+    from: process.env.SMTP_FROM ?? "",
+    to: process.env.NOTIFY_EMAIL ?? "",
+  },
   calcom: {
     apiKey: process.env.CALCOM_API_KEY ?? "",
     eventTypeId: process.env.CALCOM_EVENT_TYPE_ID ?? "",

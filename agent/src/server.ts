@@ -9,6 +9,7 @@ import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
+import { emailEnabled } from "./notify.js";
 import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,7 @@ export function createServer() {
       brain: hasBrain ? "connected" : "demo-mode (no ANTHROPIC_API_KEY)",
       calendar: calendarLabel(),
       billing: billingEnabled() ? "stripe" : "off",
+      messageAlerts: emailEnabled() ? "email" : "off (set SMTP_HOST/USER/PASS and NOTIFY_EMAIL)",
       business: business.name,
     });
   });
