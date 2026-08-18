@@ -243,13 +243,16 @@ test("a control frame replaces the stop instead of following it", () => {
   assert.doesNotMatch(body, /"finish_reason":"stop"/, "stop must not accompany a control frame");
 });
 
-test("the spoken reply is always sent before the line is moved", () => {
+test("when we do speak on a control turn, the words come before the control", () => {
+  // Hanging up is the case where this matters: the farewell has to reach the
+  // caller before the line closes, and only we can say it. (A transfer sends
+  // no text of ours at all — Vapi speaks that line. See the transfer tests.)
   const f = sseFrames({
-    ...base, reply: "Putting you through now.",
-    control: { function_call: { name: "transferCall", arguments: { destination: "+17043879775" } } },
+    ...base, reply: "Thanks for calling — take care!",
+    control: { function_call: { name: "end_call_tool", arguments: {} } },
   });
-  assert.match(f[0], /Putting you through now\./, "the farewell must be spoken first");
-  assert.ok(f.slice(1).some((x) => x.includes("transferCall")), "the control must follow the reply");
+  assert.match(f[0], /Thanks for calling/, "the farewell must be spoken first");
+  assert.ok(f.slice(1).some((x) => x.includes("end_call_tool")), "the control must follow the words");
   assert.equal(f.at(-1), "data: [DONE]\n\n");
 });
 
@@ -564,4 +567,61 @@ test("the self-transfer check compares numbers, not their formatting", () => {
       );
     }
   });
+});
+
+// ── a transfer turn carries no competing text ──────────────────────
+// Live call: Vapi accepted a correctly named tool call sent alongside a spoken
+// reply and silently did nothing. The caller heard "putting you through", then
+// asked "are you there?". A message carrying content reads as a finished
+// answer to many OpenAI-compatible parsers, which then never look at its
+// tool_calls.
+
+function withSpeaks<T>(who: string, fn: () => T): T {
+  const prev = process.env.VAPI_CONTROL_SPEAKS;
+  process.env.VAPI_CONTROL_SPEAKS = who;
+  try { return fn(); } finally {
+    if (prev === undefined) delete process.env.VAPI_CONTROL_SPEAKS;
+    else process.env.VAPI_CONTROL_SPEAKS = prev;
+  }
+}
+
+const transferControl = {
+  function_call: { name: "transfer_call_tool", arguments: { destination: "+17043879775" } },
+};
+
+test("a transfer sends the tool call with no text of our own", () => {
+  withSpeaks("", () => {
+    const body = sseFrames({ ...base, reply: "I'm putting you through.", control: transferControl }).join("");
+    assert.match(body, /transfer_call_tool/);
+    assert.doesNotMatch(body, /putting you through/, "Vapi speaks this via Message to Customer");
+  });
+});
+
+test("hanging up still speaks the farewell, which only we can say", () => {
+  withSpeaks("", () => {
+    const body = sseFrames({
+      ...base, reply: "Thanks for calling — take care!",
+      control: { function_call: { name: "end_call_tool", arguments: {} } },
+    }).join("");
+    assert.match(body, /Thanks for calling/, "there is no Vapi field for the farewell");
+    assert.match(body, /end_call_tool/);
+  });
+});
+
+test("the spoken reply can be restored without a deploy", () => {
+  withSpeaks("agent", () => {
+    const body = sseFrames({ ...base, reply: "I'm putting you through.", control: transferControl }).join("");
+    assert.match(body, /putting you through/);
+    assert.match(body, /transfer_call_tool/);
+  });
+});
+
+test("an ordinary turn always speaks, whoever is set to speak on control", () => {
+  for (const who of ["", "vapi", "agent"]) {
+    withSpeaks(who, () => {
+      const body = sseFrames({ ...base, reply: "We're open nine to six.", control: null }).join("");
+      assert.match(body, /nine to six/);
+      assert.match(body, /"finish_reason":"stop"/);
+    });
+  }
 });

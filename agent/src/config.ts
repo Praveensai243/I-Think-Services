@@ -63,6 +63,16 @@ export const env = {
    * be switched off in the host's dashboard — no redeploy, no revert. #10 cost
    * us a working phone precisely because recovery meant shipping code.
    */
+  /**
+   * Who speaks the "putting you through" line on a transfer. "vapi" (default)
+   * sends the tool call with no text of our own, because a reply carrying
+   * content appears to stop Vapi reading its tool_calls — and Vapi has its own
+   * "Message to Customer" field for that line. "agent" restores our spoken
+   * reply alongside the tool call. Switchable without a deploy.
+   */
+  get controlSpeaks(): "vapi" | "agent" {
+    return (process.env.VAPI_CONTROL_SPEAKS ?? "").toLowerCase() === "agent" ? "agent" : "vapi";
+  },
   get callControl(): boolean {
     const v = (process.env.VOICE_CALL_CONTROL ?? "").toLowerCase();
     return v === "1" || v === "true" || v === "on";
