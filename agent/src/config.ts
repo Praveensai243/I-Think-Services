@@ -46,6 +46,18 @@ export const env = {
   calendar: (process.env.CALENDAR ?? "mock").toLowerCase() as "mock" | "google" | "calcom",
   vapiSecret: process.env.VAPI_SECRET ?? "",
   /**
+   * How a call-control instruction is framed for Vapi. "tool_calls" is the
+   * ordinary OpenAI shape and the default, because Vapi sends its built-ins to
+   * us as OpenAI function definitions. "function_call" is the bare frame from
+   * Vapi's proxy example. Switchable without a deploy so a live call can settle
+   * which one Vapi actually acts on.
+   */
+  get controlShape(): "tool_calls" | "function_call" {
+    return (process.env.VAPI_CONTROL_SHAPE ?? "").toLowerCase() === "function_call"
+      ? "function_call"
+      : "tool_calls";
+  },
+  /**
    * Lets the agent hang up and transfer by sending Vapi call-control payloads.
    * Off by default and read per request, so if a live call misbehaves this can
    * be switched off in the host's dashboard — no redeploy, no revert. #10 cost
