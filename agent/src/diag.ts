@@ -78,3 +78,10 @@ export function recordWrongPath(path: string): void {
 export function getWrongPaths(): string[] {
   return [...wrongPaths];
 }
+
+/** When this process started — a fresh restart explains an empty trail. */
+const startedAt = Date.now();
+
+export function uptimeSeconds(): number {
+  return Math.round((Date.now() - startedAt) / 1000);
+}
