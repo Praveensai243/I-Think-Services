@@ -114,3 +114,88 @@ export async function sendTestEmail(): Promise<{ ok: boolean; detail: string }> 
     return { ok: false, detail: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * Confirms a booking to the caller, with a calendar file they can open.
+ *
+ * Deliberately NOT done by adding them as a Google attendee: a service account
+ * cannot send invitations without domain-wide delegation, and asking for one
+ * would trade a working booking for a Google admin project. An .ics attachment
+ * lands the same appointment in Google, Apple or Outlook with one tap, and
+ * uses the SMTP we already have.
+ */
+export interface BookingConfirmation {
+  name: string; email?: string; phone: string;
+  service: string; startISO: string; endISO: string; id: string;
+}
+
+/** iCalendar wants UTC stamped as YYYYMMDDTHHMMSSZ. */
+function icsStamp(iso: string): string {
+  return new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+export function buildIcs(b: BookingConfirmation): string {
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    `PRODID:-//${business.name}//AI Receptionist//EN`,
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:${b.id}@ithinkservices.net`,
+    `DTSTAMP:${icsStamp(new Date().toISOString())}`,
+    `DTSTART:${icsStamp(b.startISO)}`,
+    `DTEND:${icsStamp(b.endISO)}`,
+    `SUMMARY:${b.service} — ${business.name}`,
+    `DESCRIPTION:Booked by phone with ${business.agentName}. Questions? Call ${business.phoneForHumans}.`,
+    `ORGANIZER;CN=${business.name}:mailto:${env.smtp.from || env.smtp.user}`,
+    "STATUS:CONFIRMED",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+}
+
+export function confirmationEmail(b: BookingConfirmation): { subject: string; text: string } {
+  const when = new Date(b.startISO).toLocaleString("en-US", {
+    timeZone: business.timezone, weekday: "long", month: "long", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
+  return {
+    subject: `Confirmed: ${b.service} on ${when}`,
+    text: [
+      `Hi ${b.name},`,
+      "",
+      `You're booked for ${b.service} on ${when} (${business.timezone}).`,
+      "",
+      "The attached file adds it to your calendar.",
+      "",
+      `Need to change it? Call ${business.phoneForHumans}.`,
+      "",
+      `— ${business.agentName}, ${business.name}`,
+    ].join("\n"),
+  };
+}
+
+/** Not awaited: an SMTP round trip inside the caller's turn is heard as silence. */
+export function notifyBooking(b: BookingConfirmation): void {
+  if (!emailEnabled()) {
+    console.log("booking made but no SMTP configured — not emailed:", b.name);
+    return;
+  }
+  const { subject, text } = confirmationEmail(b);
+  const ics = { filename: "appointment.ics", content: buildIcs(b), contentType: "text/calendar; method=REQUEST" };
+
+  // The caller gets the confirmation; the team gets told either way, so a
+  // booking taken without an email address still reaches somebody.
+  const to = b.email || env.smtp.to;
+  getTransport()
+    .sendMail({
+      from: env.smtp.from || env.smtp.user,
+      to,
+      cc: b.email ? env.smtp.to : undefined,
+      subject: b.email ? subject : `New booking: ${b.name} (${b.phone}) — ${b.service}`,
+      text: b.email ? text : `${b.name} booked ${b.service}.\nPhone: ${b.phone}\nNo email given, so they have no confirmation.`,
+      attachments: [ics],
+    })
+    .then(() => console.log("booking emailed:", subject))
+    .catch((err) => console.error("could not email the booking:", err));
+}

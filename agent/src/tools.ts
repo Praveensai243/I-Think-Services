@@ -3,7 +3,7 @@ import { business } from "./config.js";
 import { getAvailability, book, reschedule, cancel } from "./calendar.js";
 import { messageLog, handoffLog, bookingLog } from "./store.js";
 import { recordAction } from "./usage.js";
-import { notifyNewMessage } from "./notify.js";
+import { notifyNewMessage, notifyBooking } from "./notify.js";
 
 /**
  * Tool definitions shared by BOTH surfaces:
@@ -41,6 +41,10 @@ export const tools: Anthropic.Tool[] = [
         phone: { type: "string", description: "Callback phone number." },
         service: { type: "string", description: "Service id or name." },
         start_iso: { type: "string", description: "Exact slot start (ISO 8601) from check_availability." },
+        email: {
+          type: "string",
+          description: "Caller's email, if they gave one. Send it and they get a confirmation with a calendar file; without it they leave the call with nothing written down.",
+        },
       },
       required: ["name", "phone", "service", "start_iso"],
     },
@@ -141,14 +145,19 @@ export async function runTool(
         id: r.booking!.id, name: r.booking!.name, phone: r.booking!.phone, service: r.booking!.service,
         startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "booked",
       });
+      const email = input.email ? String(input.email).trim() : undefined;
+      notifyBooking({
+        name: r.booking!.name, email, phone: r.booking!.phone,
+        service: r.booking!.service, startISO: r.booking!.startISO,
+        endISO: r.booking!.endISO, id: r.booking!.id,
+      });
       return {
         ok: true, confirmation: r.booking!.id,
         when: new Date(r.booking!.startISO).toISOString(),
         service: r.booking!.service,
-        // No reminder is promised here on purpose: nothing in this codebase
-        // sends one. Read the time back instead — a confirmation the caller
-        // hears is worth more than a text that never arrives.
-        confirm: "Read the day and time back to the caller so they have it.",
+        confirm: email
+          ? "Read the day and time back, and say a confirmation email is on its way."
+          : "Read the day and time back. They have NO written record — ask once for an email to send a confirmation to.",
       };
     }
     case "reschedule_appointment": {
