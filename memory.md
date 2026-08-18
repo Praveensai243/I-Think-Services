@@ -19,8 +19,13 @@ handoff doc for the whole project.
   feature-count. Flag cost/scope creep.
 
 ## 0b. Other working preferences
-- **Do not run anything in the background.** No scheduled check-ins, background agents, or
-  self-watching PR loops. Complete work in the foreground and hand it back.
+- **NEVER run anything in the background. This has been said more than once.** No background
+  processes, no `&` or `run_in_background`, no scheduled check-ins or wake-ups, no cron or
+  timers, no self-watching PR loops, no agents left running. If a PR-activity subscription
+  is created automatically, unsubscribe from it immediately. Do the work in the foreground,
+  finish it, and hand it back — nothing keeps running after the reply.
+- **Keep replies short and direct.** Lead with the answer or the action. No long preambles,
+  no restating the question, no exhaustive option surveys — give the recommendation.
 
 ---
 

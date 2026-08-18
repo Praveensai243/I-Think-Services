@@ -75,3 +75,41 @@ test("the test send never throws, whatever the mail server does", async () => {
     }
   }
 });
+
+// ── booking confirmations ──────────────────────────────────────────
+// The caller used to leave the call with nothing written down. A Google
+// attendee invite is not an option: a service account cannot send one without
+// domain-wide delegation, so we attach an .ics instead and send it ourselves.
+
+import { buildIcs, confirmationEmail, type BookingConfirmation } from "../src/notify.js";
+
+const booking: BookingConfirmation = {
+  id: "bk_1", name: "Sai", email: "sai@example.com", phone: "925-567-4035",
+  service: "Free AI demo & audit",
+  startISO: "2026-08-20T18:00:00.000Z", endISO: "2026-08-20T18:30:00.000Z",
+};
+
+test("the calendar file carries the real start and end", () => {
+  const ics = buildIcs(booking);
+  assert.match(ics, /BEGIN:VCALENDAR/);
+  assert.match(ics, /DTSTART:20260820T180000Z/);
+  assert.match(ics, /DTEND:20260820T183000Z/);
+  assert.match(ics, /SUMMARY:Free AI demo & audit/);
+});
+
+test("the calendar file uses CRLF, which is what the spec requires", () => {
+  // Apple Calendar and Outlook reject LF-only .ics files.
+  assert.ok(buildIcs(booking).includes("\r\n"));
+});
+
+test("the confirmation states the time in the business's timezone", () => {
+  const { subject, text } = confirmationEmail(booking);
+  // 18:00 UTC is 2pm in New York — the caller must read their local time.
+  assert.match(subject, /2:00 PM/);
+  assert.match(text, /Thursday, August 20/);
+  assert.match(text, /Sai/);
+});
+
+test("the confirmation says how to change the appointment", () => {
+  assert.match(confirmationEmail(booking).text, /704/, "a way to reach a human");
+});
