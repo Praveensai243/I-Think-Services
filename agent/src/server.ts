@@ -442,9 +442,21 @@ export function sseFrames(
       choices: [{ index: 0, delta, finish_reason: finish }],
     })}\n\n`;
 
-  // The reply always goes first, so the farewell (or "putting you through") is
-  // spoken before the line moves.
-  const frames = [chunk({ role: "assistant", content: o.reply }, null)];
+  // A transfer turn carries NO text by default.
+  //
+  // Live call: Vapi accepted a correctly named tool call alongside a spoken
+  // reply and silently did nothing — the caller heard "putting you through"
+  // and then asked "are you there?". Many OpenAI-compatible parsers treat a
+  // message that has content as a finished answer and never read its
+  // tool_calls. Vapi also has its own "Message to Customer" field on the
+  // transfer tool, which is where it expects that line to come from.
+  //
+  // endCall keeps its text: the farewell has to be spoken by us, and there is
+  // no equivalent field for it.
+  const silent = o.control
+    && o.control.function_call.name.toLowerCase().includes("transfer")
+    && env.controlSpeaks === "vapi";
+  const frames = silent ? [] : [chunk({ role: "assistant", content: o.reply }, null)];
 
   if (!o.control) {
     frames.push(chunk({}, "stop"));
