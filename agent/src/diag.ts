@@ -58,6 +58,21 @@ export function recordAuthRejection(sentSomething: boolean): void {
   if (!sentSomething) console.error("custom-llm 401: Vapi sent no secret at all");
 }
 
-export function getCounters(): { hits: number; authRejected: number } {
-  return { ...counters };
+export function getCounters(): { hits: number; authRejected: number; wrongPaths: string[] } {
+  return { ...counters, wrongPaths: getWrongPaths() };
+}
+
+/**
+ * Paths under /api/vapi that Vapi tried and we do not serve. The one that
+ * matters is the doubled /chat/completions/chat/completions, which comes from
+ * pasting the full endpoint into a field that wants the base URL.
+ */
+const wrongPaths = new Set<string>();
+
+export function recordWrongPath(path: string): void {
+  wrongPaths.add(path);
+}
+
+export function getWrongPaths(): string[] {
+  return [...wrongPaths];
 }

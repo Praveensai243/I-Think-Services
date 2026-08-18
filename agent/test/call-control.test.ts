@@ -299,7 +299,7 @@ test("the trail is capped so a long call cannot grow it without bound", () => {
 // "count: 0" had several possible meanings and the endpoint could not
 // distinguish them, which is why three debugging rounds produced no answer.
 
-import { diagnose } from "../src/server.js";
+import { diagnose, createServer } from "../src/server.js";
 
 test("no requests at all points at the Vapi assistant, not at this code", () => {
   const d = diagnose(0, { hits: 0, authRejected: 0 });
@@ -320,4 +320,40 @@ test("requests arriving but no turns completing points at a thrown error", () =>
 test("healthy traffic sends the reader to the tool list", () => {
   const d = diagnose(12, { hits: 12, authRejected: 0 });
   assert.match(d, /toolsFromVapi/);
+});
+
+// ── the misconfigured Custom LLM URL ───────────────────────────────
+// The real cause of "requestsToThisEndpoint: 0". Vapi appends /chat/completions
+// to whatever base URL you give it, so pasting the full endpoint path makes it
+// call /api/vapi/chat/completions/chat/completions — a 404 that never reaches
+// any handler, leaving the backend looking idle while every call fails.
+
+test("a doubled path is named as the cause, not reported as silence", () => {
+  const d = diagnose(0, {
+    hits: 0, authRejected: 0,
+    wrongPaths: ["/api/vapi/chat/completions/chat/completions"],
+  });
+  assert.match(d, /wrong path/);
+  assert.match(d, /BASE url/);
+  assert.doesNotMatch(d, /not pointed at this server/, "wrong path is a different fault from no traffic");
+});
+
+test("genuinely no traffic still reads as a misconfigured assistant", () => {
+  const d = diagnose(0, { hits: 0, authRejected: 0, wrongPaths: [] });
+  assert.match(d, /not pointed at this server/);
+});
+
+test("an unknown /api/vapi path returns a hint instead of a bare 404", async () => {
+  const server = createServer().listen(0);
+  await new Promise((r) => server.once("listening", r));
+  const port = (server.address() as { port: number }).port;
+  const res = await fetch(`http://127.0.0.1:${port}/api/vapi/chat/completions/chat/completions`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+  });
+  const body = await res.json() as any;
+  server.close();
+
+  assert.equal(res.status, 404);
+  assert.match(body.hint, /base URL/i);
+  assert.equal(body.youCalled, "/api/vapi/chat/completions/chat/completions");
 });
