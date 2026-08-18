@@ -166,6 +166,14 @@ export function createServer() {
     try {
       const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
       reply = out.reply || "…";
+      // A caller who has asked for a person more than once gets connected, full
+      // stop. Live transcript: they asked four times while the agent kept
+      // qualifying them. Being helpful first is right; using it to stall
+      // someone who wants a human is how you lose the call.
+      if (!out.transfer && callerInsistsOnHuman(history)) {
+        console.log("forcing transfer: caller asked for a person repeatedly");
+        out.transfer = { number: business.phoneForHumans };
+      }
       control = callControlFor(out, body, lastCallerText(history));
       // Recorded on EVERY turn, not just ones that move the line. An empty
       // trail after a test call is itself the answer: it means Vapi never
@@ -485,6 +493,22 @@ export function toE164(raw: unknown): string | null {
   if (digits.length === 11 && digits.startsWith("1")) return "+" + digits;
   if (digits.length >= 11 && digits.length <= 15) return "+" + digits;
   return null;
+}
+
+/** Ways a caller asks to stop talking to the agent and reach a human. */
+const WANTS_HUMAN =
+  /\b(?:(?:speak|talk|connect|put me through)\s+(?:to|with)?\s*(?:a\s+)?(?:real\s+)?(?:person|human|someone|somebody|agent|rep|representative|manager)|transfer\s+(?:me|the\s+call|this\s+call)|get\s+me\s+(?:a\s+)?(?:person|human|someone|somebody|manager)|real\s+person|actual\s+(?:person|human))\b/i;
+
+/**
+ * True once the caller has asked for a human more than once. One clarifying
+ * question is good service; a second refusal is the agent putting its own
+ * objective ahead of what the caller actually asked for.
+ */
+export function callerInsistsOnHuman(history: { role: string; content: unknown }[]): boolean {
+  const asks = history.filter(
+    (m) => m.role === "user" && typeof m.content === "string" && WANTS_HUMAN.test(m.content),
+  );
+  return asks.length >= 2;
 }
 
 /** A question is never a goodbye, however politely it is phrased. */
