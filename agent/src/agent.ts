@@ -72,7 +72,24 @@ export async function runAgent(
     // execute every requested tool, return all results in one user turn
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const tu of toolUses) {
-      const out = await runTool(tu.name, (tu.input ?? {}) as Record<string, unknown>, sessionId, source);
+      // A tool that throws must not take the call down with it. Google Calendar,
+      // SMTP and Cal.com are all network calls that fail sometimes; letting the
+      // exception escape killed the whole turn, and because the agent then
+      // retried the same tool on the next thing the caller said, the call was
+      // stuck repeating a canned error forever. Hand the failure back as a tool
+      // result instead so the agent can apologise and take a message.
+      let out: Record<string, unknown>;
+      try {
+        out = await runTool(tu.name, (tu.input ?? {}) as Record<string, unknown>, sessionId, source);
+      } catch (err) {
+        console.error(`tool ${tu.name} failed:`, err);
+        out = {
+          ok: false,
+          error: "tool_failed",
+          tell_caller:
+            "Something went wrong saving that. Apologise briefly, do NOT try the same thing again, and offer to take a message or put them through to a person.",
+        };
+      }
       actions.push({ tool: tu.name, result: out });
       if (tu.name === "transfer_to_human" && out.number) transfer = { number: String(out.number) };
       if (tu.name === "end_call") ended = true;

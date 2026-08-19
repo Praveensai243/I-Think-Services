@@ -188,7 +188,12 @@ export function createServer() {
       logCallControlDiagnostics(body, out, control, lastCallerText(history), reply, callId);
     } catch (err) {
       console.error("custom-llm error", err);
-      reply = "Sorry, I didn't catch that — could you say it again?";
+      // NOT "I didn't catch that". This fires when OUR side broke, and dressing
+      // a backend failure up as a hearing problem sent a caller round the same
+      // loop for a whole call — they kept repeating themselves at something
+      // that was never listening. Say what is true and offer a way out.
+      reply =
+        `Sorry — something went wrong on my end just then. You can reach the team directly on ${business.phoneForHumans}, or tell me and I'll take a message.`;
     }
 
     const id = "chatcmpl-" + Date.now();
