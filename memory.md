@@ -379,6 +379,18 @@ gap with its own "I couldn't catch that". Three fixes in #35:
   diagnostics trail and the log. Silence is either a slow turn or a dead one and they need
   opposite fixes; this is the number that tells them apart.
 
+**Third live call (after #35 deployed): still quiet, at the same spot — right after the
+caller repeats their email.** Found the actual bug, and it is not latency:
+- The prompt tells the agent to **re-book with the same time** when a caller corrects their
+  email. `book()` then ran its free/busy check and found **the appointment it had made
+  seconds earlier**, called the slot taken, and sent the agent hunting for another time —
+  many model calls, no words, while the caller waited.
+- Fixed (#36): re-booking the same caller into the same slot returns the appointment they
+  already have, instead of clashing with it.
+- Also fixed: the Anthropic SDK waits **ten minutes** by default before giving up on a
+  request. On a call that is a dead line, and the 8s turn deadline could not save it — the
+  deadline only gets a look BETWEEN rounds, never during one. Now bounded to 8s per call.
+
 **Streaming is still the real fix for silence** and is still NOT done. Read the `tookMs`
 numbers from a real call first, then ship it alone per the #10 rule.
 
