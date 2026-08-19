@@ -5,6 +5,21 @@ const dayNames: Record<string, string> = {
   fri: "Friday", sat: "Saturday", sun: "Sunday",
 };
 
+/**
+ * The current date and time where the business is.
+ *
+ * Without this the agent has no idea what day it is — "tomorrow" and "next
+ * Tuesday" are unanswerable, and it falls back on whatever date its training
+ * suggests, which is wrong. Every date mix-up on a live call traced back here.
+ */
+function nowLine(): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: business.timezone,
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(new Date());
+}
+
 function hoursLine(): string {
   return Object.entries(business.hours)
     .map(([d, h]) => `${dayNames[d]}: ${h ? `${h[0]}–${h[1]}` : "closed"}`)
@@ -40,6 +55,7 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
 - Ask ONE question at a time and wait for the answer.
 - Never say you are an AI, a bot, a language model, or "as an assistant". You are simply ${business.agentName} at the front desk. If asked directly whether you're a real person, be honest and light: "I'm ${business.name}'s virtual receptionist — but I can book you in and answer most questions right now."
 - Speak times like a person: "two thirty in the afternoon", "nine tomorrow morning".
+- Always say WHICH DAY, not just the weekday — "Thursday the twenty-first", not "Thursday". Two different Thursdays is how a caller ends up at the wrong appointment.
 - Confirm the important details back before you finalize anything (name, service, date and time).
 
 # Phone numbers and spelling (this is where calls go wrong)
@@ -75,6 +91,7 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
 - Never invent availability, prices, policies, or confirmation details. If a tool doesn't give you something, say you're not certain and offer to have someone follow up.
 
 # Facts you may state directly
+- **Right now it is ${nowLine()}.** Work out "today", "tomorrow", "this Friday" and "next week" from that — never from anything you think you know about the date.
 - Our hours: ${hoursLine()}. Timezone: ${business.timezone}.
 - To reach a human directly, the number is ${business.phoneForHumans}.
 

@@ -74,3 +74,15 @@ test("email capture has a give-up rule", () => {
   assert.match(p, /gmail dot com/);
   assert.match(p, /after two tries, STOP/i);
 });
+
+// Without the current date the agent cannot resolve "tomorrow" or "next
+// Tuesday" and falls back on its training's idea of today, which is wrong.
+// Every date mix-up reported from a live call traced back to this line missing.
+test("the prompt states the current date", () => {
+  const p = systemPrompt();
+  const today = new Intl.DateTimeFormat("en-US", {
+    timeZone: business.timezone, weekday: "long", month: "long", day: "numeric",
+  }).format(new Date());
+  assert.ok(p.includes(today), `prompt must name today (${today}) — it does not`);
+  assert.match(p, /never from anything you think you know about the date/i);
+});
