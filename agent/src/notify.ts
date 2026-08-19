@@ -177,6 +177,16 @@ export function confirmationEmail(b: BookingConfirmation): { subject: string; te
 
 /** Not awaited: an SMTP round trip inside the caller's turn is heard as silence. */
 export function notifyBooking(b: BookingConfirmation): void {
+  try {
+    sendBookingEmail(b);
+  } catch (err) {
+    // The appointment is already in the calendar. A confirmation that cannot be
+    // built or sent is worth a log line, never a failed booking on a live call.
+    console.error("could not send the booking confirmation:", err);
+  }
+}
+
+function sendBookingEmail(b: BookingConfirmation): void {
   if (!emailEnabled()) {
     console.log("booking made but no SMTP configured — not emailed:", b.name);
     return;
