@@ -65,3 +65,12 @@ test("the system prompt stays inside its latency budget", () => {
     `system prompt is ~${Math.round(approxTokens)} tokens; every turn pays for this`,
   );
 });
+
+// Emails are the worst thing to take by ear: spoken letters sound alike and a
+// wrong one fails silently — the caller just never gets the confirmation.
+test("email capture has a give-up rule", () => {
+  const p = systemPrompt();
+  assert.match(p, /TWO halves/);
+  assert.match(p, /gmail dot com/);
+  assert.match(p, /after two tries, STOP/i);
+});
