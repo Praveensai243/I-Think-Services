@@ -52,7 +52,7 @@ to a human when needed.
     **custom-LLM** endpoint so voice platforms just forward the conversation to it. This
     makes the voice platform swappable (≈ a URL change) and keeps all logic in our code.
   - **Multi-tenant by config:** `agent/business.config.json` holds one business's knowledge
-    (hours, services, ~23-entry FAQ, greeting, escalation). Run a client with
+    (hours, services, a 38-entry FAQ, greeting, escalation, `objective`). Run a client with
     `BUSINESS_CONFIG=clients/<slug>.json`. Templates in `agent/examples/` (dental, salon,
     home-services). Scaffold a client with `npm run new-client`.
   - **Booking backends:** `mock` (in-memory, default/demo), `google` (Google Calendar), and
@@ -63,8 +63,10 @@ to a human when needed.
 - `/api/agent/turn` (web chat) · `/api/vapi/chat/completions` (**Vapi custom-LLM brain**)
 - `/api/vapi/function` (tool webhook + end-of-call minutes) · `/api/vapi/assistant` (config)
 - `/api/admin/data` (usage + bookings + messages + transfers) · `/api/billing/checkout`
-- Agent tools: check_availability, book/reschedule/cancel_appointment, answer_faq,
-  take_message, transfer_to_human.
+- `/api/admin/diagnostics` (last 50 turns) · `/api/admin/calendar-check` · `/api/admin/test-email`
+- Agent tools: check_availability, book/reschedule/cancel_appointment, take_message,
+  transfer_to_human, end_call. **There is no `answer_faq` tool** — the whole FAQ ships
+  inside the system prompt instead (see §6).
 
 ## 4. Environment variables (Render)
 `ANTHROPIC_API_KEY` (set ✅), `MODEL=claude-haiku-4-5` (set ✅ — fast for voice; opus-5 = max
@@ -73,7 +75,7 @@ smarts), `ADMIN_TOKEN`, `PUBLIC_BASE_URL` (= the Render URL), `CALENDAR`, `GOOGL
 
 ## 5. Current status
 **Live:** marketing site (with real contact info); agent backend on Render (Haiku +
-23-topic AI-services knowledge); admin dashboard; usage tracking; Stripe billing
+38-topic AI-services knowledge); admin dashboard; usage tracking; Stripe billing
 (keyless-safe/off until keys added); multi-client configs; the custom-LLM brain.
 
 **THE PHONE — WORKING END TO END ✅ (2026-08-18).** Answers, knows the business, books to
@@ -95,6 +97,9 @@ paths under `/api/vapi` now 404 with an explanation instead of silently.
 - Fill the transfer tool's **"Message to Customer"**; we deliberately send no words of our
   own on a transfer turn (see below), so that field is what the caller hears.
 - Transcriber: Deepgram Nova 2 Phonecall. First Message: the real greeting, not "Hello."
+- The Custom LLM entry in Vapi is named **"Charlotte"** — that is a dashboard label only.
+  The agent introduces herself as **Ava** (`agentName` in `business.config.json`); don't
+  "fix" one to match the other without asking.
 
 **Talking to Vapi — three rules learned the hard way:**
 1. **Tool names come from the dashboard**, e.g. `transfer_call_tool`, not `transferCall`.
@@ -129,6 +134,14 @@ what they said; number in the subject so it is readable from a lock screen). Any
 provider: `SMTP_HOST/PORT/USER/PASS/FROM` + `NOTIFY_EMAIL`. Keyless-safe — with nothing
 configured it logs and the call still completes. This email is also the only durable copy
 of a message until there is a database.
+
+**Booking confirmations — LIVE ✅.** `book_appointment` takes an optional email and the
+agent asks for it once before booking. The caller gets a confirmation with the time in
+their own local wording plus an **.ics attachment** that adds it to Google/Apple/Outlook
+in one tap. Deliberately NOT done by adding them as a Google attendee: a service account
+cannot send invitations without domain-wide delegation, and chasing that would trade a
+working booking for a Google admin project. Rides the same SMTP as message alerts, so no
+SMTP means no confirmation — the booking still succeeds.
 
 **Guards that live in code, not in the prompt.** Each was added after a prompt rule failed
 on a live call — Haiku is fast but does not reliably honour a negative instruction buried
@@ -169,8 +182,14 @@ in a long prompt:
   actually uses. Don't guess before then.
 
 **Accounts:** Anthropic ✅ ($5 credit + key). Render ✅ (live; confirm Starter plan).
-Google Calendar ✅ (service account, live). Vapi: in setup. ElevenLabs / Twilio / Stripe /
+Google Calendar ✅ (service account, live). **Vapi ✅ (assistant + number live, taking real
+calls).** SMTP ✅ (message alerts + booking confirmations). ElevenLabs / Twilio / Stripe /
 Cal.com: later.
+
+**The number is a free Vapi test number and is inbound-only.** Fine — inbound *is* the
+product. It is not the number to publish: before giving it to prospects, buy a local
+**Charlotte, NC** number (~$2/mo) and reassign the assistant. A number is a pointer;
+swapping it is a dropdown change, so nothing is stranded by testing on the free one.
 
 ## 6. Decisions made
 - **Voice platform: start on Vapi** (already integrated + deployed + working). **Retell is
@@ -180,6 +199,18 @@ Cal.com: later.
   wanted. **None are agency-native** → our backend + per-client configs + (future) agency
   portal ARE the white-label layer. Don't re-platform before validating demand.
 - **Model:** Claude via our backend; the voice platform carries no LLM key.
+- **The FAQ lives in the prompt, not behind a tool.** `answer_faq` matched caller wording to
+  FAQ keys by substring, so "how much does it cost" never reached the entry keyed `pricing`
+  and the agent claimed ignorance with the answer sitting in the config. A keyword scorer was
+  tried and lost to neighbouring entries ("cost of missing calls" outscored "pricing" on the
+  word *cost*). Inlining it lets Claude match phrasing properly **and removes a tool round
+  trip from every factual question**, which the caller hears. Cost: ~1.2k prompt tokens.
+  Don't reintroduce a lookup tool without a much larger FAQ than 38 entries.
+- **Never ask a caller to recite their phone number.** Vapi sends the caller ID on every
+  request; the agent reads it back ("is that the best number?"). Phone audio mangles digits —
+  a live call needed ten repeats before this. When digits must be taken by ear: chunked, read
+  back per chunk, single unclear digit queried alone, and after two failures stop asking and
+  take a message. **A frustrated caller who hangs up is worse than a note with a gap.**
 - **Ship voice changes one at a time.** #10 bundled two changes, broke the phone, and cost
   us the ability to tell which one did it. The **SSE transport is the danger zone** — a bug
   there produces silence, not a bad answer, and silence is the one failure a caller cannot
@@ -188,9 +219,12 @@ Cal.com: later.
 
 ## 7. Deferred / roadmap (do later, in this order)
 0. ~~Get the phone answering~~ **DONE** — live, taking real calls.
-1. **Make the live phone good enough to demo:** merge PR #12 → switch the transcriber to
-   Deepgram Nova → then fix latency by re-attempting #10 **as two separate commits**
-   (`end_call` first, streaming second), diagnosing the silence from Render logs first.
+1. **Latency is the last thing standing between this and a sellable demo.** The caller waits
+   for the whole reply before hearing a word. In order of cost:
+   **(a) prompt caching** — the system prompt is byte-identical every turn and is now ~3.4k
+   tokens; cheapest win, no transport risk.
+   **(b) real streaming** — the #10 retry. `end_call` already re-landed separately, so this
+   ships **alone**, and only after reading Render logs from a call. Do not re-bundle it.
 2. ~~Turn on the real calendar~~ **DONE** — live on contact@ithinkservices.net.
 2b. **Get the number in front of one real local business.** The product answers calls and
    books to a real calendar; the bottleneck is now demand, not features. Recurring cost is
@@ -230,3 +264,7 @@ revert and GitHub called it a conflict. Fix is a rebase onto `main`, not a merge
 **Check for open PRs at the start of a session.** #12 sat finished-but-unmerged in draft for
 three days because the handoff doc didn't mention it. `memory.md` is only as good as its
 last update — update it when the state changes, not just when a task finishes.
+
+**State as of 2026-08-19: no open PRs. Everything through #27 is merged and deployed.**
+PR #12 (caller ID, chunked digits, inlined FAQ, `objective`) is merged — earlier roadmap
+text told you to merge it; ignore that, it's done.
