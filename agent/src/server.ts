@@ -168,11 +168,14 @@ export function createServer() {
     const dialedNumber: string | undefined =
       call?.phoneNumber?.number ?? call?.phoneNumberId ?? call?.to ?? undefined;
 
-    let reply = "…";
+    // Never the empty-sounding placeholder: whatever we put here is what the
+    // caller hears if everything else fails, and silence is the one failure
+    // they cannot work around.
+    let reply = "Sorry, I went quiet there for a second — where were we?";
     let control: VapiControl = null;
     try {
       const out = await runAgent(history, "vapi:" + callId, "phone", { callerPhone });
-      reply = out.reply || "…";
+      reply = out.reply || reply;
       // A caller who has asked for a person more than once gets connected, full
       // stop. Live transcript: they asked four times while the agent kept
       // qualifying them. Being helpful first is right; using it to stall

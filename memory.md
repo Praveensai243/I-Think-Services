@@ -391,6 +391,22 @@ caller repeats their email.** Found the actual bug, and it is not latency:
   request. On a call that is a dead line, and the 8s turn deadline could not save it — the
   deadline only gets a look BETWEEN rounds, never during one. Now bounded to 8s per call.
 
+**Fourth live call — two separate bugs, both fixed in #37:**
+1. **"o" comes back from the transcriber as "0" (zero).** The caller spelled "santoo", the
+   transcript said "sant0o", and saying "o as in Oscar" could not help — the damage was in
+   the text before the agent ever saw it. Now repaired in code: a digit wedged BETWEEN two
+   letters in the local part is a letter (0→o, 1→l, 5→s). Deliberately narrow — digits at
+   the end of a name are real (praveensai243@…), and inventing an address nobody owns is
+   worse than the mishearing.
+2. **"…" was our SILENCE STRING.** When the model ended a turn with no words — most often
+   right after a tool call, exactly when the caller has just confirmed something — we sent
+   an ellipsis, the voice had nothing to say, and the caller heard dead air with no way to
+   tell it from a dropped call. Same class of mistake as "Sorry, I didn't catch that": **a
+   fallback must sound like what it is.** Now it speaks what the tools actually did.
+3. Also: the read-back of an email happens **once per call**, enforced in code (`tools.ts`
+   counts bookings per session), not by a prompt rule. A second read-back invites a second
+   correction and the caller ends up confirming an appointment that is already booked.
+
 **Streaming is still the real fix for silence** and is still NOT done. Read the `tookMs`
 numbers from a real call first, then ship it alone per the #10 rule.
 

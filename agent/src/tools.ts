@@ -4,6 +4,7 @@ import { getAvailability, book, reschedule, cancel } from "./calendar.js";
 import { messageLog, handoffLog, bookingLog } from "./store.js";
 import { recordAction } from "./usage.js";
 import { notifyNewMessage, notifyBooking } from "./notify.js";
+import { normalizeSpokenEmail } from "./spoken.js";
 
 /**
  * Tool definitions shared by BOTH surfaces:
@@ -119,6 +120,37 @@ export const tools: Anthropic.Tool[] = [
 
 type Json = Record<string, unknown>;
 
+/**
+ * How many times each call has already booked.
+ *
+ * The read-back of the email address is worth doing ONCE. Repeating it is how a
+ * live call died: every booking returned the same "read it back" instruction,
+ * so a caller correcting one letter got asked to confirm again, and again. A
+ * prompt rule did not hold here — Haiku follows the instruction it was just
+ * handed — so the instruction itself has to change on the second pass.
+ */
+const bookingsThisCall = new Map<string, number>();
+
+/**
+ * What to say after a booking — which is NOT the same thing on the second pass.
+ *
+ * First time: read the address back, because an address the caller never hears
+ * is an address nobody catches. After that: stop. A second read-back invites a
+ * second correction, and the caller ends up trapped confirming the same address
+ * while the appointment they already have sits there booked. An address that is
+ * still wrong after one correction is not worth the call — the booking stands,
+ * and someone can ring them.
+ */
+export function confirmWording(attempt: number, email?: string): string {
+  if (!email) {
+    return "Read the day and time back. They have NO written record — ask once for an email to send a confirmation to.";
+  }
+  if (attempt <= 1) {
+    return `Read the day and time back, then say out loud where the confirmation is going — say "${email}" as words, like "santoo dot saipraveen at gmail dot com". If the caller says that is wrong, take the correct address and call book_appointment again with the SAME start_iso; the slot is already theirs.`;
+  }
+  return `Booked, and the confirmation is going to "${email}". Say ONLY that it is all set and the confirmation is on its way — do NOT spell the address out again and do NOT ask them to confirm it a second time. If they say it is still wrong, apologise once, tell them the team will confirm by phone instead, and move on. The appointment is already made either way.`;
+}
+
 /** Execute a tool by name and return a compact JSON-serializable result. */
 export async function runTool(
   name: string, input: Json, sessionId: string, source: "web" | "phone" = "web",
@@ -145,7 +177,11 @@ export async function runTool(
         id: r.booking!.id, name: r.booking!.name, phone: r.booking!.phone, service: r.booking!.service,
         startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "booked",
       });
-      const email = input.email ? String(input.email).trim() : undefined;
+      // What the transcriber heard is not what the caller said: a spelled "oh"
+      // comes back as a zero. Repair it before it reaches the confirmation.
+      const email = input.email ? normalizeSpokenEmail(String(input.email)) || undefined : undefined;
+      const attempt = (bookingsThisCall.get(sessionId) ?? 0) + 1;
+      bookingsThisCall.set(sessionId, attempt);
       notifyBooking({
         name: r.booking!.name, email, phone: r.booking!.phone,
         service: r.booking!.service, startISO: r.booking!.startISO,
@@ -159,9 +195,7 @@ export async function runTool(
         // attempts at one email and book an earlier, wrong one; speaking the
         // value back is the only thing that catches that while the caller is
         // still on the line.
-        confirm: email
-          ? `Read the day and time back, then say out loud where the confirmation is going — say "${email}" as words, like "santoo dot saipraveen at gmail dot com". If the caller says that is wrong, take the correct address and call book_appointment again with the SAME start_iso; the slot is already theirs.`
-          : "Read the day and time back. They have NO written record — ask once for an email to send a confirmation to.",
+        confirm: confirmWording(attempt, email),
       };
     }
     case "reschedule_appointment": {

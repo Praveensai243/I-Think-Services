@@ -117,7 +117,23 @@ export async function runAgent(
         .map((b) => b.text)
         .join(" ")
         .trim();
-      return done(reply || "…");
+      if (reply) return done(reply);
+
+      // An ellipsis was our SILENCE STRING, and it read as a bug in the phone
+      // line: the model occasionally ends a turn with no words at all — most
+      // often right after a tool call, which is exactly when the caller has
+      // just confirmed something and is waiting to hear that it worked. We sent
+      // "…", the voice had nothing to speak, and the caller sat listening to
+      // dead air with no way to tell that from a dropped call.
+      //
+      // Never hand the phone an empty turn. Say what the tools actually did.
+      console.warn(`empty reply from the model (stop_reason ${res.stop_reason}); speaking a fallback`);
+      const booked = actions.some((a) => a.tool === "book_appointment" && a.result.ok);
+      return done(
+        booked
+          ? "You're all set — I've got that booked for you. Is there anything else I can help with?"
+          : "Sorry, I went quiet there for a second — where were we?",
+      );
     }
 
     // execute every requested tool, return all results in one user turn
