@@ -24,8 +24,11 @@ handoff doc for the whole project.
   timers, no self-watching PR loops, no agents left running. If a PR-activity subscription
   is created automatically, unsubscribe from it immediately. Do the work in the foreground,
   finish it, and hand it back — nothing keeps running after the reply.
-- **Keep replies short and direct.** Lead with the answer or the action. No long preambles,
-  no restating the question, no exhaustive option surveys — give the recommendation.
+- **Keep replies short and direct, in simple words.** Lead with the answer or the action.
+  No long preambles, no restating the question, no exhaustive option surveys — give the
+  recommendation. Plain English over jargon; explain a technical term only if it changes
+  what the user should do. Said more than once — a wall of headings and tables is not a
+  good answer to a one-line question.
 
 ---
 
