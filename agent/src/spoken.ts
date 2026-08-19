@@ -28,6 +28,35 @@ export function repairSpelledWord(word: string): string {
 }
 
 /**
+ * Words callers spell with. NATO plus the "police alphabet" people actually
+ * use on the phone — a live caller mixed both in one breath: "Sam, alpha,
+ * Nancy, tango, Oscar, Oscar" for santoo.
+ */
+const PHONETIC = new Set([
+  "alpha", "alfa", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel",
+  "india", "indigo", "juliet", "juliett", "kilo", "lima", "mike", "november",
+  "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform", "victor",
+  "whiskey", "xray", "x-ray", "yankee", "zulu",
+  "adam", "boy", "charles", "david", "edward", "frank", "george", "henry", "ida",
+  "john", "king", "lincoln", "mary", "nancy", "ocean", "paul", "queen", "robert",
+  "sam", "tom", "union", "william", "young", "zebra",
+]);
+
+/**
+ * Collapse a spelled-out run of phonetic words into the letters they stand for.
+ *
+ * Only fires when THREE or more of them appear together, so an address that
+ * genuinely contains "oscar" or "victor" is left alone — one stray word is a
+ * name, three in a row is someone spelling.
+ */
+export function decodePhonetic(text: string): string {
+  const words = String(text ?? "").toLowerCase().split(/[^a-z-]+/).filter(Boolean);
+  const hits = words.filter((w) => PHONETIC.has(w)).length;
+  if (hits < 3) return String(text ?? "");
+  return words.map((w) => (PHONETIC.has(w) ? w[0] : w)).join("");
+}
+
+/**
  * Turn what the transcriber heard into an address worth sending mail to.
  *
  * Handles the spoken forms too — "santoo at gmail dot com", and the spaces
@@ -36,6 +65,9 @@ export function repairSpelledWord(word: string): string {
 export function normalizeSpokenEmail(raw: string): string {
   let s = String(raw ?? "").trim().toLowerCase();
   s = s.replace(/\s+at\s+/g, "@").replace(/\s+dot\s+/g, ".");
+  // "Sam alpha Nancy tango Oscar Oscar" is santoo. Done per part so a decoded
+  // local half never swallows the domain.
+  s = s.split("@").map(decodePhonetic).join("@");
   s = s.replace(/\s+/g, "");
   const at = s.lastIndexOf("@");
   if (at < 1) return s;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeSpokenEmail, repairSpelledWord } from "../src/spoken.js";
+import { normalizeSpokenEmail, repairSpelledWord, decodePhonetic } from "../src/spoken.js";
 import { confirmWording } from "../src/tools.js";
 
 // A live call: the caller spelled "santoo" and the transcript said "sant0o" —
@@ -48,4 +48,26 @@ test("a second address must not be read back again", () => {
   const w = confirmWording(2, "santoo@gmail.com");
   assert.match(w, /do NOT spell the address out again/);
   assert.match(w, /confirm by phone/, "there has to be a way out that is not another read-back");
+});
+
+// ── spelling with words ────────────────────────────────────────────
+// From a live call: "It's a sand alpha Nancy tango Oscar Oscar dot Sam alpha
+// indigo Paul Romeo Victor echo…". The caller spelled the whole address in the
+// phonetic alphabet, mixing NATO and the police one, and the agent guessed at
+// it for a hundred seconds — "antoo", "saitraveen", "saipraviep".
+
+test("a run of phonetic words becomes the letters they stand for", () => {
+  assert.equal(decodePhonetic("Sam alpha Nancy tango Oscar Oscar"), "santoo");
+  assert.equal(normalizeSpokenEmail("Sam alpha Nancy tango Oscar Oscar at gmail dot com"), "santoo@gmail.com");
+});
+
+test("one phonetic word on its own is a word, not spelling", () => {
+  // Real addresses contain these. Three in a row is someone spelling; one is a
+  // name, and rewriting it would invent an address nobody owns.
+  assert.equal(decodePhonetic("oscar"), "oscar");
+  assert.equal(normalizeSpokenEmail("oscar.romeo@gmail.com"), "oscar.romeo@gmail.com");
+});
+
+test("the domain survives a decoded local part", () => {
+  assert.equal(normalizeSpokenEmail("sam alpha india@gmail.com"), "sai@gmail.com");
 });
