@@ -9,7 +9,7 @@ import { respond, runAgent } from "./agent.js";
 import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
-import { emailEnabled, sendTestEmail } from "./notify.js";
+import { emailEnabled, sendTestEmail, notifyCallTranscript } from "./notify.js";
 import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath, uptimeSeconds, startedAtISO } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -88,10 +88,21 @@ export function createServer() {
     const sessionId = "vapi:" + (req.body?.call?.id ?? msg.call?.id ?? "unknown");
 
     try {
-      // Completed call → record billable minutes.
+      // Completed call → record billable minutes, and email what happened.
       if (msg.type === "end-of-call-report") {
         const seconds = Number(msg.durationSeconds ?? msg.call?.durationSeconds ?? 0);
         if (seconds > 0) recordPhoneCall(seconds);
+        const callId = String(req.body?.call?.id ?? msg.call?.id ?? "unknown");
+        notifyCallTranscript({
+          callId,
+          from: msg.call?.customer?.number ?? req.body?.call?.customer?.number,
+          seconds,
+          endedReason: msg.endedReason ?? msg.call?.endedReason,
+          booked: bookingLog
+            .filter((b) => b.sessionId === sessionId && b.action === "booked")
+            .map((b) => ({ name: b.name, service: b.service, startISO: b.startISO })),
+          lines: transcriptLines(msg, callId),
+        });
         return res.json({ ok: true });
       }
 
@@ -388,6 +399,35 @@ export function createServer() {
   app.get("/", (_req, res) => res.sendFile(resolve(__dirname, "../public/demo.html")));
 
   return app;
+}
+
+/**
+ * The conversation, oldest turn first.
+ *
+ * Vapi's own transcript is preferred when it sends one. When it does not — and
+ * it does not always — the turns we recorded ourselves are rebuilt instead, so
+ * a finished call is never reported with nothing to read. That trail is in
+ * memory, so it is only as good as the process being the one that took the
+ * call; Vapi's copy is the one that survives a restart.
+ */
+export function transcriptLines(msg: any, callId: string): string[] {
+  const fromVapi = Array.isArray(msg?.artifact?.messages) ? msg.artifact.messages : msg?.messages;
+  if (Array.isArray(fromVapi) && fromVapi.length) {
+    return fromVapi
+      .filter((m: any) => m?.role === "user" || m?.role === "bot" || m?.role === "assistant")
+      .map((m: any) => `${m.role === "user" ? "Caller" : business.agentName}: ${String(m.message ?? m.content ?? "").trim()}`)
+      .filter((line: string) => !/:\s*$/.test(line));
+  }
+  if (typeof msg?.transcript === "string" && msg.transcript.trim()) {
+    return msg.transcript.trim().split(/\r?\n/);
+  }
+  return getCallEvents()
+    .filter((e) => e.callId === callId)
+    .reverse()
+    .flatMap((e) => [
+      ...(e.callerSaid ? [`Caller: ${e.callerSaid}`] : []),
+      ...(e.agentSaid ? [`${business.agentName}: ${e.agentSaid}`] : []),
+    ]);
 }
 
 /**

@@ -209,3 +209,67 @@ function sendBookingEmail(b: BookingConfirmation): void {
     .then(() => console.log("booking emailed:", subject))
     .catch((err) => console.error("could not email the booking:", err));
 }
+
+
+// ── the call transcript ───────────────────────────────────────────
+/** What happened on one finished call, as far as we can reconstruct it. */
+export interface CallRecord {
+  callId: string;
+  from?: string;
+  seconds: number;
+  endedReason?: string;
+  booked: { name: string; service: string; startISO: string }[];
+  /** "Caller: …" / "Charlotte: …" lines, oldest first. */
+  lines: string[];
+}
+
+function transcriptEmail(c: CallRecord): { subject: string; text: string } {
+  const mins = Math.floor(c.seconds / 60);
+  const secs = c.seconds % 60;
+  const outcome = c.booked.length ? "BOOKED" : "no booking";
+  // The number goes in the subject so it is readable from a lock screen
+  // without opening anything — same reason as the message alerts.
+  const subject = `Call ${outcome} — ${c.from ?? "unknown number"} (${mins}m ${secs}s)`;
+  const booked = c.booked.length
+    ? c.booked.map((b) => `  • ${b.service} for ${b.name} — ${when(b.startISO)}`).join("\n")
+    : "  • none";
+  return {
+    subject,
+    text: [
+      `Caller: ${c.from ?? "number not sent by the phone platform"}`,
+      `Length: ${mins}m ${secs}s`,
+      `Ended: ${c.endedReason ?? "not stated"}`,
+      "",
+      "Booked on this call:",
+      booked,
+      "",
+      "── Transcript ──",
+      c.lines.length ? c.lines.join("\n") : "(the phone platform sent no transcript, and no turns were recorded)",
+      "",
+      `— ${business.agentName}, ${business.name}`,
+    ].join("\n"),
+  };
+}
+
+/**
+ * Email the transcript of a finished call.
+ *
+ * Never awaited and never throws: this runs while Vapi is waiting on the
+ * end-of-call webhook, and a mail server having a bad day must not turn a
+ * completed call into a failed one.
+ */
+export function notifyCallTranscript(c: CallRecord): void {
+  try {
+    if (!emailEnabled()) {
+      console.log("call finished but no SMTP configured — transcript not emailed:", c.callId);
+      return;
+    }
+    const { subject, text } = transcriptEmail(c);
+    getTransport()
+      .sendMail({ from: env.smtp.from || env.smtp.user, to: env.smtp.to, subject, text })
+      .then(() => console.log("transcript emailed:", subject))
+      .catch((err) => console.error("could not email the transcript:", err));
+  } catch (err) {
+    console.error("could not build the transcript email:", err);
+  }
+}

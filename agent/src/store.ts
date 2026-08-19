@@ -29,6 +29,8 @@ export interface Handoff { reason: string; at: string; sessionId: string }
 export interface BookingRecord {
   id: string; name: string; phone: string; service: string;
   startISO: string; at: string; source: "web" | "phone"; action: "booked" | "rescheduled" | "cancelled";
+  /** Which call made it — so the end-of-call email can say what that call achieved. */
+  sessionId?: string;
 }
 
 export const messageLog: MessageNote[] = [];
