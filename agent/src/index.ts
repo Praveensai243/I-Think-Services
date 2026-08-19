@@ -1,5 +1,9 @@
 import { createServer } from "./server.js";
+import { installCrashGuards } from "./crash.js";
 import { env, hasBrain, usingGoogle, business } from "./config.js";
+
+// Before anything else: a crash drops every live call at once.
+installCrashGuards();
 
 const app = createServer();
 

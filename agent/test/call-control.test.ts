@@ -649,3 +649,37 @@ test("a wrong path is named even on a fresh restart", () => {
   });
   assert.match(d, /wrong path/, "a real fault outranks the restart explanation");
 });
+
+// ── a turn that throws has to leave a trace ────────────────────────
+// A live call: the caller confirmed a booking, then heard a canned "could you
+// say that again" on every following turn whatever they said. The trail from
+// that call was EMPTY — the diagnostics call sat inside the try block, so the
+// turns that broke were the only ones that recorded nothing at all, and the
+// page then blamed a Vapi setting that was demonstrably working (the booking
+// had gone through). Both halves of that are fixed here.
+
+test("a failed turn is recorded, with the error on it", () => {
+  logCallControlDiagnostics(
+    { stream: true }, {}, null, "yes, confirmed", "Sorry — something went wrong on my end just then.",
+    "call-failed", "TypeError: cannot read properties of undefined",
+  );
+  const [event] = getCallEvents();
+  assert.equal(event.callId, "call-failed");
+  assert.match(String(event.failed), /TypeError/, "the error text is the whole point of recording it");
+});
+
+test("recorded failures lead the diagnosis, ahead of everything else", () => {
+  const d = diagnose(4, {
+    hits: 4, authRejected: 0, uptime: 600,
+    failedTurns: 3, lastError: "TypeError: cannot read properties of undefined",
+  });
+  assert.match(d, /threw before the agent could reply/);
+  assert.match(d, /TypeError/);
+  assert.doesNotMatch(d, /toolsFromVapi/, "our own breakage outranks the tool-list hint");
+});
+
+test("an empty trail offers the restart, not just a config accusation", () => {
+  const d = diagnose(0, { hits: 0, authRejected: 0, uptime: 6 * 60 * 60 });
+  assert.match(d, /restarted AFTER your call/, "a booking that went through proves the assistant reaches us");
+  assert.match(d, /serverStartedAt/, "the reader needs the one field that settles it");
+});
