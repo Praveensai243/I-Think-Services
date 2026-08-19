@@ -128,6 +128,13 @@ message does not help — Vapi only fires it on SIP transfers.
   decided, what we sent Vapi, and **the tool list Vapi declared**. Leads with a plain-words
   diagnosis. Request counting happens *before* auth, so "nothing arrived" and "we rejected
   it" are distinguishable.
+  **⚠️ The trail and the counters are per-process and in memory — a restart zeroes them.**
+  An empty page therefore does NOT mean the assistant is misconfigured; it can equally mean
+  the process restarted after the call. Check `serverStartedAt` against the time you called:
+  if the process is younger than the call, this page knows nothing about it. Every turn is
+  now also written to the host log as a `CALL-TURN` line, and **the Render log is the copy
+  that survives a restart** — go there when the trail is empty. A turn that throws is
+  recorded too, with the error on it; it used to be the one kind of turn that left no trace.
 - `/api/admin/test-email?token=…` — sends a real test alert and returns the mail server's
   own error.
 - `/api/admin/calendar-check?token=…` — proves the calendar wiring.
@@ -305,6 +312,19 @@ last update — update it when the state changes, not just when a task finishes.
 **State as of 2026-08-19: no open PRs. Everything through #33 is merged and deployed.**
 PR #12 (caller ID, chunked digits, inlined FAQ, `objective`) is merged — earlier roadmap
 text told you to merge it; ignore that, it's done.
+
+**Live call, 2026-08-19 (post-#33): the symptom came back.** The caller booked a time,
+confirmed it, and from then on heard a canned "I couldn't catch that, could you say it
+again?" on every turn whatever they said. Diagnostics afterwards showed
+`requestsToThisEndpoint: 0` and an empty trail — which the page wrongly read as "the
+assistant is not pointed at this server". It cannot be: the booking went through, so Vapi
+was reaching the brain. The zeros mean the **process restarted between the call and the
+check**, taking the evidence with it. Root cause still unknown; the open questions are
+whether Render restarted *during* the call (its Events tab and logs answer this, and they
+survive restarts) and whether the service is on Free (spins down) or Starter.
+**Note the wording:** that canned line is NOT ours any more — ours says "something went
+wrong on my end". A phrase we don't ship is Vapi filling silence, which points at our
+endpoint being slow, dead, or returning nothing.
 
 **Where the last session stopped.** #29–#33 all shipped from live-call bug reports: email
 capture, the Charlotte rename, the missing date, corrections not winning, and tool failures

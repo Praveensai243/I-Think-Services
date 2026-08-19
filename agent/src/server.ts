@@ -10,7 +10,7 @@ import { resetSession, messageLog, handoffLog, bookingLog } from "./store.js";
 import { getUsage, recordPhoneCall } from "./usage.js";
 import { billingEnabled, createCheckout, verifyWebhook } from "./billing.js";
 import { emailEnabled, sendTestEmail } from "./notify.js";
-import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath, uptimeSeconds } from "./diag.js";
+import { recordCallEvent, getCallEvents, short, recordEndpointHit, recordAuthRejection, getCounters, recordWrongPath, uptimeSeconds, startedAtISO } from "./diag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -194,6 +194,14 @@ export function createServer() {
       // that was never listening. Say what is true and offer a way out.
       reply =
         `Sorry — something went wrong on my end just then. You can reach the team directly on ${business.phoneForHumans}, or tell me and I'll take a message.`;
+      // Record the failure as a turn. Until now the diagnostics call sat inside
+      // the try, so the turns worth reading — the ones that broke — were the
+      // only ones that left nothing behind, and the trail simply stopped mid
+      // call with no hint that anything had gone wrong.
+      logCallControlDiagnostics(
+        body, {}, null, lastCallerText(history), reply, callId,
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      );
     }
 
     const id = "chatcmpl-" + Date.now();
@@ -319,9 +327,19 @@ export function createServer() {
   app.get("/api/admin/diagnostics", requireAdmin, (_req, res) => {
     const events = getCallEvents();
     const counters = getCounters();
+    const failed = events.filter((e) => e.failed);
     res.json({
-      diagnosis: diagnose(events.length, { ...counters, uptime: uptimeSeconds() }),
+      diagnosis: diagnose(events.length, {
+        ...counters,
+        uptime: uptimeSeconds(),
+        failedTurns: failed.length,
+        lastError: failed[0]?.failed,
+      }),
       requestsToThisEndpoint: counters.hits,
+      // Compare this with the time of the call you are asking about. A start
+      // time AFTER that call means this process is not the one that took it.
+      serverStartedAt: startedAtISO(),
+      serverUpForSeconds: uptimeSeconds(),
       wrongPathsTried: counters.wrongPaths,
       rejectedForBadSecret: counters.authRejected,
       secretRequiredHere: Boolean(env.vapiSecret),
@@ -512,8 +530,23 @@ export function sseFrames(
  * zero rejections means Vapi is not talking to this server at all, which no
  * change to this codebase can fix.
  */
-export function diagnose(turns: number, c: { hits: number; authRejected: number; wrongPaths?: string[]; uptime?: number }): string {
+export function diagnose(
+  turns: number,
+  c: {
+    hits: number; authRejected: number; wrongPaths?: string[]; uptime?: number;
+    failedTurns?: number; lastError?: string;
+  },
+): string {
   const wrong = c.wrongPaths ?? [];
+  // Lead with our own breakage when there is any. A caller hears a thrown turn
+  // as the agent not understanding them, so this is the sentence that stops
+  // someone debugging the transcriber for a fault that is in this process.
+  if (c.failedTurns) {
+    return `${c.failedTurns} of the last ${turns} recorded turn(s) threw before the agent could reply`
+      + (c.lastError ? ` — most recently: ${c.lastError}` : "")
+      + ". The caller hears this as the agent not understanding them, whatever they say. Read the failed "
+      + "events below and the host logs for 'custom-llm error'.";
+  }
   if (c.hits === 0 && wrong.length > 0) {
     return "Vapi is reaching this server but calling the wrong path: " + wrong.join(", ")
       + ". The Custom LLM URL in Vapi must be the BASE url — Vapi appends /chat/completions itself, so "
@@ -527,9 +560,17 @@ export function diagnose(turns: number, c: { hits: number; authRejected: number;
       + "minute(s) ago — that is expected right after a deploy. Place a call, then reload this page.";
   }
   if (c.hits === 0) {
-    return "Nothing has reached this endpoint since the last restart. If you have called since then, "
-      + "the Vapi assistant is not pointed at this server — check that its model provider is Custom LLM "
-      + "with url .../api/vapi/chat/completions. Until that is true, no change to this code affects a call.";
+    // Two very different faults look identical here, and this used to name only
+    // one of them. A caller whose booking went through has PROVED the assistant
+    // reaches this server, so telling them to go re-point it is wrong and costs
+    // a round of debugging. The counters live in memory: a restart zeroes them.
+    const up = Math.round((c.uptime ?? 0) / 60);
+    return `Nothing has reached this endpoint in the ${up} minute(s) this process has been up. `
+      + "Either nobody has called in that window, or the process restarted AFTER your call and took the "
+      + "trail with it — compare serverStartedAt below with the time you called, and check the host's "
+      + "restart events. If the call is older than this process, this page cannot tell you anything about "
+      + "it; the host logs can. If it is NOT, the Vapi assistant is not pointed at this server — check "
+      + "that its model provider is Custom LLM with url .../api/vapi.";
   }
   if (c.authRejected === c.hits) {
     return "Every request was rejected: VAPI_SECRET is set on this server but Vapi is not sending a "
@@ -545,9 +586,9 @@ export function diagnose(turns: number, c: { hits: number; authRejected: number;
 }
 
 /**
- * Printed only on turns that try to move or end the call — the ones we cannot
- * diagnose from the outside, because a Vapi error and a working hang-up sound
- * identical to the caller.
+ * Records one turn, in both places: the in-memory trail behind
+ * /api/admin/diagnostics, and the host's log — which is the only one of the two
+ * that survives a restart.
  *
  * `toolsFromVapi` is the one that settles the open question: Vapi sends the
  * assistant's own tool list on every request, so if endCall and transferCall
@@ -561,6 +602,7 @@ export function logCallControlDiagnostics(
   callerSaid = "",
   agentSaid = "",
   callId = "",
+  failed?: string,
 ): void {
   const tools = Array.isArray(body?.tools) ? body.tools : [];
   const event = {
@@ -577,11 +619,14 @@ export function logCallControlDiagnostics(
     dialedNumber: body?.call?.phoneNumber?.number ?? body?.call?.to ?? null,
     controlEnabled: env.callControl,
     streaming: Boolean(body?.stream),
+    ...(failed ? { failed } : {}),
   };
   recordCallEvent(event);
-  // Still logged for the host's log viewer; the endpoint is for when that is
-  // hard to reach from a phone.
-  if (out.transfer || out.ended) console.log("CALL-CONTROL " + JSON.stringify(event));
+  // Every turn goes to the host's log viewer, not just the ones that move the
+  // line. The trail above is in memory, so a restart erases exactly the call
+  // you are trying to debug — which has now happened twice. Render keeps logs
+  // across restarts, so this line is the copy that survives.
+  console.log("CALL-TURN " + JSON.stringify(event));
 }
 
 /**

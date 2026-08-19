@@ -23,6 +23,8 @@ export interface CallEvent {
   dialedNumber?: unknown;
   controlEnabled: boolean;
   streaming: boolean;
+  /** Set when the turn threw. A failed turn used to leave no trace at all. */
+  failed?: string;
 }
 
 const MAX = 50;
@@ -84,4 +86,15 @@ const startedAt = Date.now();
 
 export function uptimeSeconds(): number {
   return Math.round((Date.now() - startedAt) / 1000);
+}
+
+/**
+ * When this process started, as a wall-clock time.
+ *
+ * The one fact that tells a restart apart from a misconfigured assistant: if
+ * this is LATER than the call you are asking about, the trail you are reading
+ * is not the trail of that call — the process restarted and took it with it.
+ */
+export function startedAtISO(): string {
+  return new Date(startedAt).toISOString();
 }
