@@ -128,12 +128,18 @@ export async function runAgent(
       //
       // Never hand the phone an empty turn. Say what the tools actually did.
       console.warn(`empty reply from the model (stop_reason ${res.stop_reason}); speaking a fallback`);
-      const booked = actions.some((a) => a.tool === "book_appointment" && a.result.ok);
-      return done(
-        booked
-          ? "You're all set — I've got that booked for you. Is there anything else I can help with?"
-          : "Sorry, I went quiet there for a second — where were we?",
-      );
+      // Match the fallback to what the turn actually did. A live call ended on
+      // "Nope, that's all" and heard "Sorry, I went quiet there for a second —
+      // where were we?" as the line closed, because the model called end_call
+      // and wrote no farewell. A goodbye is the one line a caller remembers.
+      if (ended) return done("Thanks for calling — have a lovely day.");
+      if (actions.some((a) => a.tool === "book_appointment" && a.result.ok)) {
+        return done("You're all set — I've got that booked for you. Anything else I can help with?");
+      }
+      if (actions.some((a) => a.tool === "take_message" && a.result.ok)) {
+        return done("I've passed that on — someone will get back to you shortly. Anything else?");
+      }
+      return done("Sorry, I went quiet there for a second — where were we?");
     }
 
     // execute every requested tool, return all results in one user turn

@@ -38,7 +38,7 @@ test("caller ID is offered back instead of asking for digits", () => {
 test("digits are taken in chunks, never re-read whole", () => {
   const p = systemPrompt();
   assert.match(p, /chunks/i);
-  assert.match(p, /never make the caller repeat a whole number twice/i);
+  assert.match(p, /never make a caller repeat a whole number twice/i);
 });
 
 test("prompt reflects the client's own topics, not clinic assumptions", () => {
@@ -70,19 +70,14 @@ test("the system prompt stays inside its latency budget", () => {
 // wrong one fails silently — the caller just never gets the confirmation.
 test("email capture has a give-up rule", () => {
   const p = systemPrompt();
-  // The email is no longer taken in two halves before booking — it is asked
-  // for ONCE, after the appointment is already made. Taking it up front was
-  // costing four exchanges and several minutes on a two-minute call.
-  assert.match(p, /only AFTER the appointment is booked/i);
-  assert.match(p, /gmail dot com/);
-  // The rule got STRICTER: read back once, then give up and book without it.
-  // Two failed tries was already one too many for a caller spelling letters
-  // into a phone.
-  assert.match(p, /Read it back ONCE/i);
-  // The give-up is now stronger than "book without it": the appointment is
-  // already made before the address is ever asked for, so a bad address costs
-  // the caller nothing.
-  assert.match(p, /the appointment stands/i);
+  // Read-backs are GONE, not merely limited. A live call spent 100 seconds of
+  // a 3-minute call spelling one address, because every read-back invited
+  // another correction. The appointment is already made by then and we already
+  // have the caller's phone number, so a wrong address costs nothing and a
+  // confirmation loop costs the call.
+  assert.match(p, /ONE pass, NO read-back/i);
+  assert.match(p, /Do NOT read the address back/i);
+  assert.match(p, /if it bounces/i);
 });
 
 // Without the current date the agent cannot resolve "tomorrow" or "next
@@ -103,8 +98,7 @@ test("the prompt states the current date", () => {
 // a wrong one is caught while the caller is still on the line.
 test("a correction overrides earlier attempts", () => {
   const p = systemPrompt();
-  assert.match(p, /A correction kills every earlier version/);
-  assert.match(p, /only the LAST thing the caller confirmed/i);
+  assert.match(p, /use their LAST version/i);
   // A mis-heard letter now arrives as a DIGIT, so the rule has to name that:
   // "o as in Oscar" never helped, because the damage was already in the text.
   assert.match(p, /digit inside a spelled name is a LETTER/i);

@@ -434,7 +434,28 @@ message alerts.
 **Timing after the four-exchange rewrite: ~3 minutes, down from 3–5.** The turn count is
 now near the floor; what is left is the per-turn wait, and that is streaming.
 
-**Streaming is still the real fix for silence** and is still NOT done. Read the `tookMs`
+**⚠️ STREAMING IS NO LONGER THE PRIORITY — the backend is already fast.** First real
+timings from a live call (2026-08-19, 20 turns): **every model call 0.6–1.9s**, tools
+0.2–0.8s, a whole turn 0.6–2.6s. The single slowest turn in the call was 4.8s (book +
+message + three model calls). Our thinking time is NOT what makes a call feel long.
+What makes it long is the NUMBER of turns:
+- 20 turns for one booking. **Ten of them were the caller spelling an email address**
+  (~100 seconds of a 3-minute call), because every read-back invited another correction.
+- Fixed (#40): the email is now ONE pass with **no read-back at all**. Ask, take what you
+  hear, book, say "if it bounces we'll ring you". The appointment already exists and we
+  already have their phone number, so a wrong address costs nothing — and a confirmation
+  loop costs the call.
+- The caller was spelling in the phonetic alphabet ("Sam alpha Nancy tango Oscar Oscar" =
+  santoo) and the agent kept mangling it. `decodePhonetic` now does this in code, and only
+  when three or more phonetic words appear together, so a real "oscar@…" is left alone.
+- Also fixed: the caller said "Nope, that's all" and heard **"Sorry, I went quiet there for
+  a second — where were we?"** as the line closed. The model called end_call and wrote no
+  farewell, so our empty-turn fallback spoke. The fallback now matches what the turn did —
+  a goodbye when the call is ending, "you're all set" after a booking.
+
+Streaming would buy a fraction of a second per turn. Cutting one unnecessary question buys
+fifteen. **Cut questions first; revisit streaming only when a call is under two minutes and
+still feels slow.** Read the `tookMs`
 numbers from a real call first, then ship it alone per the #10 rule.
 
 Next steps:
