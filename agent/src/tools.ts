@@ -150,7 +150,7 @@ export function confirmWording(attempt: number, email?: string): string {
     return "Booked. Say the day, date and time back ONCE, then ask — once — if they'd like a confirmation emailed. If they do, call book_appointment again with the SAME start_iso and their address. If they hesitate, leave it; the appointment is made.";
   }
   if (attempt <= 1) {
-    return `Read the day and time back, then say out loud where the confirmation is going — say "${email}" as words, like "santoo dot saipraveen at gmail dot com". If the caller says that is wrong, take the correct address and call book_appointment again with the SAME start_iso; the slot is already theirs.`;
+    return `Read the day and time back, then say where the confirmation is going — say "${email}" as words, "dot" and "at" out loud. Do NOT ask them to confirm it. If they correct it unprompted, call book_appointment again with the SAME start_iso and their new address.`;
   }
   return `Booked, and the confirmation is going to "${email}". Say ONLY that it is all set and the confirmation is on its way — do NOT spell the address out again and do NOT ask them to confirm it a second time. If they say it is still wrong, apologise once, tell them the team will confirm by phone instead, and move on. The appointment is already made either way.`;
 }

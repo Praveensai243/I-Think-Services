@@ -54,6 +54,20 @@ handoff doc for the whole project.
   empty. Next: 1) Open Render → Events, check for a restart at the time you called.
   2) Tell me if the plan is Free or Starter."
 
+- **Everything we build is a TEMPLATE, not a one-off for us.** Our own business is client
+  zero. Onboarding a real client must be: copy a config, replace their business data and
+  contact details, point `BUSINESS_CONFIG` at it — nothing else. So:
+  - **Never hardcode our name, number, email, domain, or anyone's personal details** in
+    `src/`. Every business-specific value comes from the config file. This is checked by
+    `test/template.test.ts`, which builds the prompt from a DIFFERENT client and fails if
+    anything of ours survives.
+  - New behaviour goes in the shared code path, driven by config — never a special case for
+    us that a client would have to have removed.
+  - If a fix needs a new config field, add it to `agent/examples/*.json` too, or client
+    onboarding breaks on the first business that lacks it.
+  - Ask of every change: "what does a plumber in Charlotte have to edit to use this?" The
+    answer must be "their config file".
+
 ---
 
 ## 1. What this business is
@@ -452,6 +466,13 @@ What makes it long is the NUMBER of turns:
   a second — where were we?"** as the line closed. The model called end_call and wrote no
   farewell, so our empty-turn fallback spoke. The fallback now matches what the turn did —
   a goodbye when the call is ending, "you're all set" after a booking.
+
+**Template audit done (#41).** Three of our own details had leaked into shipped text and
+would have gone out with a client's agent: a personal email address inside the
+`book_appointment` instructions, "santoo" as the worked example in the prompt's spelling
+rule, and `ithinkservices.net` baked into every calendar (.ics) file. All three now come
+from config or a neutral example. `examples/dental.json` is missing `objective` — harmless
+(the prompt omits that section) but worth adding when the examples are next touched.
 
 Streaming would buy a fraction of a second per turn. Cutting one unnecessary question buys
 fifteen. **Cut questions first; revisit streaming only when a call is under two minutes and
