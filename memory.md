@@ -407,6 +407,21 @@ caller repeats their email.** Found the actual bug, and it is not latency:
    counts bookings per session), not by a prompt rule. A second read-back invites a second
    correction and the caller ends up confirming an appointment that is already booked.
 
+**A booking call was taking 3–5 minutes; it has to be under two.** The cost was never
+per-turn speed — it was **turn COUNT**. The old flow asked: which service, which day, which
+time, name, number, email first half, domain, confirm email, confirm everything, book. Ten
+exchanges × ~15–20s of round trip each = the whole complaint. Rewritten (#38) as a
+four-exchange script:
+1. "I want to book" → call check_availability immediately and **offer two real times**.
+   Never ask which day first.
+2. They pick → ask name AND confirm the caller-ID number in one breath.
+3. Book. Say day/date/time back once.
+4. Only then, once: "want a confirmation emailed?"
+**The email moved to AFTER the booking** — it was four exchanges of the ten and the source
+of every bug in the last three calls. A bad address now costs nothing: the appointment is
+already made. In code, `tools.ts` counts **emails per call, not bookings**, so the address
+is read back exactly once.
+
 **Streaming is still the real fix for silence** and is still NOT done. Read the `tookMs`
 numbers from a real call first, then ship it alone per the #10 rule.
 

@@ -121,15 +121,19 @@ export const tools: Anthropic.Tool[] = [
 type Json = Record<string, unknown>;
 
 /**
- * How many times each call has already booked.
+ * How many times each call has booked WITH an email address.
  *
- * The read-back of the email address is worth doing ONCE. Repeating it is how a
- * live call died: every booking returned the same "read it back" instruction,
- * so a caller correcting one letter got asked to confirm again, and again. A
- * prompt rule did not hold here — Haiku follows the instruction it was just
- * handed — so the instruction itself has to change on the second pass.
+ * Not bookings — emails. The appointment is now made before the address is ever
+ * asked for, so the address arrives on the second booking of the call, and that
+ * is the one that deserves a read-back.
+ *
+ * The read-back is worth doing exactly once. Repeating it is how a live call
+ * died: every booking returned the same "read it back" instruction, so a caller
+ * correcting one letter was asked to confirm again, and again. A prompt rule did
+ * not hold here — Haiku follows the instruction it was just handed — so the
+ * instruction itself has to change on the second pass.
  */
-const bookingsThisCall = new Map<string, number>();
+const emailAttemptsThisCall = new Map<string, number>();
 
 /**
  * What to say after a booking — which is NOT the same thing on the second pass.
@@ -143,7 +147,7 @@ const bookingsThisCall = new Map<string, number>();
  */
 export function confirmWording(attempt: number, email?: string): string {
   if (!email) {
-    return "Read the day and time back. They have NO written record — ask once for an email to send a confirmation to.";
+    return "Booked. Say the day, date and time back ONCE, then ask — once — if they'd like a confirmation emailed. If they do, call book_appointment again with the SAME start_iso and their address. If they hesitate, leave it; the appointment is made.";
   }
   if (attempt <= 1) {
     return `Read the day and time back, then say out loud where the confirmation is going — say "${email}" as words, like "santoo dot saipraveen at gmail dot com". If the caller says that is wrong, take the correct address and call book_appointment again with the SAME start_iso; the slot is already theirs.`;
@@ -180,8 +184,8 @@ export async function runTool(
       // What the transcriber heard is not what the caller said: a spelled "oh"
       // comes back as a zero. Repair it before it reaches the confirmation.
       const email = input.email ? normalizeSpokenEmail(String(input.email)) || undefined : undefined;
-      const attempt = (bookingsThisCall.get(sessionId) ?? 0) + 1;
-      bookingsThisCall.set(sessionId, attempt);
+      let attempt = emailAttemptsThisCall.get(sessionId) ?? 0;
+      if (email) emailAttemptsThisCall.set(sessionId, (attempt += 1));
       notifyBooking({
         name: r.booking!.name, email, phone: r.booking!.phone,
         service: r.booking!.service, startISO: r.booking!.startISO,
