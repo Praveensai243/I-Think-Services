@@ -5,7 +5,16 @@ import { tools, runTool } from "./tools.js";
 import { getSession } from "./store.js";
 import { recordWebTurn } from "./usage.js";
 
-const client = hasBrain ? new Anthropic({ apiKey: env.anthropicKey }) : null;
+/**
+ * The SDK waits TEN MINUTES by default before giving up on a request. On a
+ * phone call that is not a timeout, it is a dead line: the caller hears
+ * nothing, hangs up, and the turn deadline below never fires because it only
+ * gets a look in between rounds, never during one. Bound it hard, and prefer
+ * an honest apology over silence.
+ */
+const client = hasBrain
+  ? new Anthropic({ apiKey: env.anthropicKey, timeout: 8000, maxRetries: 1 })
+  : null;
 
 export interface AgentTurn {
   reply: string;

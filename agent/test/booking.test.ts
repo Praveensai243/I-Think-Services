@@ -89,3 +89,29 @@ test("a rejected reschedule keeps the original appointment", async () => {
   assert.equal(steal.ok, false, "failed reschedule destroyed the original appointment");
   assert.equal(steal.reason, "slot_taken");
 });
+
+// ── correcting an email must not fight the booking it just made ────
+// A live call: the caller gave their email, the agent read it back, the caller
+// corrected it — and the line went quiet. The prompt tells the agent to re-book
+// with the SAME time when an address is fixed, and the free/busy check then saw
+// the appointment made seconds earlier and reported the slot as taken. The
+// agent went hunting for another time while the caller heard nothing.
+
+test("re-booking the same caller at the same time returns their appointment, not a clash", async () => {
+  const slots = await getAvailability({ service: "cleaning" });
+  const slot = slots[slots.length - 1];
+  assert.ok(slot, "need a free slot to book");
+  const details = {
+    name: "Sai Praveen", phone: "704-555-0142",
+    service: "cleaning", startISO: slot.startISO,
+  };
+
+  const first = await book(details);
+  assert.equal(first.ok, true, "the first booking must succeed for this test to mean anything");
+
+  // The caller corrected their email, so the agent books once more — same time.
+  const second = await book(details);
+  assert.equal(second.ok, true, "a correction is not a double booking");
+  assert.equal(second.booking?.startISO, first.booking?.startISO, "same slot, same appointment");
+  assert.notEqual(second.reason, "slot_taken");
+});

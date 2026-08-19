@@ -234,6 +234,18 @@ export async function book(input: {
   const start = new Date(input.startISO);
   if (isNaN(start.getTime())) return { ok: false, reason: "invalid_time" };
   const end = new Date(start.getTime() + need * 60000);
+
+  // Booking the same caller into the same slot twice is a CORRECTION, not a
+  // clash. The agent is told to re-book with the same time when a caller fixes
+  // their email — and the free/busy check below would then see the appointment
+  // we just made, call the slot taken, and send the agent hunting for another
+  // time while the caller sat listening to nothing. Hand back the appointment
+  // they already have instead; the confirmation then goes to the fixed address.
+  const already = await findBooking({ phone: input.phone, name: input.name });
+  if (already && already.startISO === start.toISOString()) {
+    return { ok: true, booking: { ...already, name: input.name, phone: input.phone } };
+  }
+
   const busy = await busyIntervals(start.toISOString(), end.toISOString());
   if (busy.some(([bs, be]) => start.getTime() < be && end.getTime() > bs)) {
     return { ok: false, reason: "slot_taken" };
