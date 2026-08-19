@@ -96,3 +96,34 @@ test("a correction overrides earlier attempts", () => {
   assert.match(p, /A correction kills every earlier version/);
   assert.match(p, /o as in Oscar/);
 });
+
+// ── the half we cache must never move ──────────────────────────────
+// Prompt caching is a prefix match: one changed byte anywhere invalidates the
+// whole thing. The clock line changes every minute and the caller's number
+// changes every call, so while those sat in the middle of the prompt nothing
+// in it could be cached — including the 38-entry FAQ we resend on every single
+// turn. They now live in a separate block that goes AFTER the cache point.
+
+import { systemPromptStable, systemPromptLive } from "../src/prompt.js";
+
+test("the cached half is identical for different callers", () => {
+  assert.equal(systemPromptStable(), systemPromptStable());
+  assert.doesNotMatch(systemPromptStable(), /\+1704555/);
+});
+
+test("the cached half holds nothing that changes by the minute", () => {
+  const stable = systemPromptStable();
+  assert.doesNotMatch(stable, /\b\d{1,2}:\d{2}\s?(AM|PM)\b/i, "a clock in here kills every cache hit");
+  assert.doesNotMatch(stable, new RegExp(String(new Date().getFullYear())), "and so does today's date");
+});
+
+test("the live half still tells the agent the date and who is calling", () => {
+  const live = systemPromptLive({ callerPhone: "+17045551234" });
+  assert.match(live, new RegExp(String(new Date().getFullYear())));
+  assert.match(live, /\+17045551234/);
+});
+
+test("the FAQ is in the cached half, since it is what makes caching worth doing", () => {
+  assert.match(systemPromptStable(), /pricing/i);
+  assert.ok(systemPromptStable().length > systemPromptLive().length * 10);
+});

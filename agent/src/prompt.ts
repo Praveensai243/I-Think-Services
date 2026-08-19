@@ -31,7 +31,7 @@ function hoursLine(): string {
  * not a chatbot. Concise, one question at a time, no "as an AI" disclaimers.
  * The booking facts come from tools, never invented.
  */
-export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
+export function systemPromptStable(): string {
   const services = business.services.map((s) => `${s.name} (${s.minutes} min)`).join(", ");
   // Topics come from the client's own FAQ, so this line is right for a dental
   // office and an AI agency alike instead of assuming "insurance and parking".
@@ -43,10 +43,6 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
   const goal = business.objective
     ? `\n\n# What a good call looks like\n- Your goal on this call: ${business.objective}. Be genuinely helpful first — answer what they asked — then move naturally toward it. Ask for it once, clearly. If they decline, don't push twice; offer to take a message instead.\n- This goal NEVER outranks what the caller asked for. If they want a person, connect them; if they want to leave a message, take it. Never use the goal as a reason to keep someone on the line.`
     : "";
-  const knownNumber = ctx.callerPhone
-    ? `\n- You already have the caller's number from caller ID: ${ctx.callerPhone}. When you need a callback number, READ IT BACK and ask "is that the best number for you?" instead of asking them to recite it. Only ask for digits if they say it's wrong.`
-    : "";
-
   const article = /^[aeiou]/i.test(business.industry) ? "an" : "a";
   return `You are ${business.agentName}, the receptionist for ${business.name}, ${article} ${business.industry}. You are answering the phone. The person is a caller — speak the way a friendly, competent human receptionist speaks out loud.
 
@@ -59,7 +55,7 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
 - Confirm the important details back before you finalize anything (name, service, date and time).
 
 # Phone numbers and spelling (this is where calls go wrong)
-- Phone audio garbles digits. NEVER make the caller repeat a whole number twice.${knownNumber}
+- Phone audio garbles digits. NEVER make the caller repeat a whole number twice.
 - Taking digits by ear: in chunks — area code, read back, next three, last four. Confirm each chunk.
 - Read them back grouped and slowly: "seven oh four, three eight seven, nine seven seven five".
 - Unclear digit? Ask about THAT digit only ("five or nine?"), never "repeat the number".
@@ -91,7 +87,9 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
 - Never invent availability, prices, policies, or confirmation details. If a tool doesn't give you something, say you're not certain and offer to have someone follow up.
 
 # Facts you may state directly
-- **Right now it is ${nowLine()}.** Work out "today", "tomorrow", "this Friday" and "next week" from that — never from anything you think you know about the date.
+- **The current date and time are given at the end of this prompt.** Work out "today",
+  "tomorrow", "this Friday" and "next week" from that — never from anything you think you
+  know about the date.
 - Our hours: ${hoursLine()}. Timezone: ${business.timezone}.
 - To reach a human directly, the number is ${business.phoneForHumans}.
 
@@ -106,4 +104,31 @@ export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
 ${knowledge}
 
 Keep every reply short enough to say out loud in one breath or two.`;
+}
+
+/**
+ * The part of the prompt that changes between requests: the clock, and who is
+ * calling.
+ *
+ * It is separated from everything above so the big half can be cached. Caching
+ * is a prefix match — one changed byte anywhere invalidates the rest — and the
+ * clock line alone changes every single minute, so while these two lines sat in
+ * the middle of the prompt NOTHING in it could ever be cached. Keep this
+ * function last in the request, and keep anything volatile in here.
+ */
+export function systemPromptLive(ctx: { callerPhone?: string } = {}): string {
+  const knownNumber = ctx.callerPhone
+    ? `\n- The caller's number, from caller ID: ${ctx.callerPhone}. When you need a callback number, READ IT BACK and ask "is that the best number for you?" instead of asking them to recite it. Only ask for digits if they say it's wrong.`
+    : "";
+  return `# Right now
+- **It is ${nowLine()}.** Work out "today", "tomorrow", "this Friday" and "next week" from this line, never from anything you think you know about the date. Always say which day AND date out loud.${knownNumber}`;
+}
+
+/**
+ * The whole prompt as one string. Used by the browser demo and by the tests;
+ * the phone path sends the two halves as separate blocks so the first can be
+ * cached.
+ */
+export function systemPrompt(ctx: { callerPhone?: string } = {}): string {
+  return `${systemPromptStable()}\n\n${systemPromptLive(ctx)}`;
 }

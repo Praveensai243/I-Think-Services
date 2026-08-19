@@ -25,6 +25,10 @@ export interface CallEvent {
   streaming: boolean;
   /** Set when the turn threw. A failed turn used to leave no trace at all. */
   failed?: string;
+  /** How long the caller waited for this turn, and where it went. */
+  tookMs?: number;
+  modelMs?: number[];
+  toolMs?: { name: string; ms: number }[];
 }
 
 const MAX = 50;

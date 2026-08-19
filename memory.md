@@ -363,6 +363,25 @@ Fixed (#35): the server now logs that kind of error and keeps running, and the c
 sends the reply back to the phone is inside a safety net too. A wrong answer on one turn is
 survivable; a dead phone line is not.
 
+**Second live call: it takes the email, then goes quiet.** Silence lands on the booking
+turn — the slowest turn in the call. That turn can run up to six model calls plus two
+Google Calendar calls before the caller hears one word, and Vapi eventually talks over the
+gap with its own "I couldn't catch that". Three fixes in #35:
+- **A turn now has a deadline (8s, `VOICE_TURN_DEADLINE_MS`).** Past it the agent stops
+  working and says "one moment" instead of leaving the line silent. Work already done stays
+  done.
+- **Prompt caching is live.** The prompt is now sent as two blocks: the big unchanging half
+  (persona + rules + the 38-entry FAQ) is cached, and the clock and caller number moved
+  AFTER it. **This is why caching never would have worked before** — the memo said the
+  prompt was byte-identical every turn, and it was not: the clock line changes every minute
+  and sat in the middle, so nothing could ever be cached.
+- **Every turn now records how long it took**, split by model call and tool call, in the
+  diagnostics trail and the log. Silence is either a slow turn or a dead one and they need
+  opposite fixes; this is the number that tells them apart.
+
+**Streaming is still the real fix for silence** and is still NOT done. Read the `tookMs`
+numbers from a real call first, then ship it alone per the #10 rule.
+
 Next steps:
 1. Merge #35, wait for Render to finish deploying, then call the number and repeat the
    same thing: book a time and confirm it.

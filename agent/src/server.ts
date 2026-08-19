@@ -185,7 +185,7 @@ export function createServer() {
       // Recorded on EVERY turn, not just ones that move the line. An empty
       // trail after a test call is itself the answer: it means Vapi never
       // reached this endpoint.
-      logCallControlDiagnostics(body, out, control, lastCallerText(history), reply, callId);
+      logCallControlDiagnostics(body, out, control, lastCallerText(history), reply, callId, undefined, out.timing);
     } catch (err) {
       console.error("custom-llm error", err);
       // NOT "I didn't catch that". This fires when OUR side broke, and dressing
@@ -613,6 +613,7 @@ export function logCallControlDiagnostics(
   agentSaid = "",
   callId = "",
   failed?: string,
+  timing?: { totalMs: number; model: number[]; tools: { name: string; ms: number }[] },
 ): void {
   const tools = Array.isArray(body?.tools) ? body.tools : [];
   const event = {
@@ -630,6 +631,9 @@ export function logCallControlDiagnostics(
     controlEnabled: env.callControl,
     streaming: Boolean(body?.stream),
     ...(failed ? { failed } : {}),
+    // How long the caller waited, and what they waited for. Silence on the line
+    // is either a slow turn or a dead one, and they need opposite fixes.
+    ...(timing ? { tookMs: timing.totalMs, modelMs: timing.model, toolMs: timing.tools } : {}),
   };
   recordCallEvent(event);
   // Every turn goes to the host's log viewer, not just the ones that move the
