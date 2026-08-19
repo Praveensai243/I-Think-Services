@@ -208,22 +208,32 @@ export function createServer() {
     const created = Math.floor(Date.now() / 1000);
     const model = body.model || env.model;
 
-    if (body.stream) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      for (const frame of sseFrames({ id, created, model, reply, control })) res.write(frame);
-      return res.end();
+    // Sending the reply is inside a guard too. Express 4 does not catch an
+    // async throw in a route, so a write to a socket Vapi has already dropped
+    // used to become an unhandled rejection — which ends the whole process and
+    // with it every other call on the line.
+    try {
+      if (body.stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        for (const frame of sseFrames({ id, created, model, reply, control })) res.write(frame);
+        return res.end();
+      }
+      res.json({
+        id, object: "chat.completion", created, model,
+        choices: [{
+          index: 0,
+          message: { role: "assistant", content: reply, ...(control ?? {}) },
+          finish_reason: "stop",
+        }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      });
+    } catch (err) {
+      console.error("could not send the reply to Vapi:", err);
+      if (!res.headersSent) res.status(500).json({ error: "send_failed" });
+      else res.end();
     }
-    res.json({
-      id, object: "chat.completion", created, model,
-      choices: [{
-        index: 0,
-        message: { role: "assistant", content: reply, ...(control ?? {}) },
-        finish_reason: "stop",
-      }],
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-    });
   });
 
   app.get("/api/vapi/assistant", (_req, res) => {

@@ -350,13 +350,27 @@ What we know:
   end". So the phone system was talking over silence from us — our server was slow, dead,
   or sent nothing back.
 
-Next steps for whoever picks this up:
-1. Render dashboard → **Events**: did the server restart while the call was happening?
-2. Render dashboard → **Logs** at the call time: look for an error, or the startup banner
-   ("AI receptionist") appearing mid-call. Render keeps logs through a restart.
-3. Check the Render plan. **Free** goes to sleep when idle and wakes slowly, which alone
-   could cause this. Starter ($7/mo) does not sleep. This is unconfirmed and worth
-   ruling out before writing any more code.
+**Confirmed the same day: the server RESTARTED, and the plan is Starter.** Starter never
+sleeps, so it did not idle out — **it crashed.**
+
+Why one small error killed the whole phone line: nothing was guarding the process. Node
+shuts down on a stray failed background job (an unhandled promise rejection), and Express 4
+lets any error inside a route's async code become exactly that. So one failure — an email
+that would not send, a socket the phone system had already closed — ended EVERY call in
+progress and wiped the diagnostics page.
+
+Fixed (#35): the server now logs that kind of error and keeps running, and the code that
+sends the reply back to the phone is inside a safety net too. A wrong answer on one turn is
+survivable; a dead phone line is not.
+
+Next steps:
+1. Merge #35, wait for Render to finish deploying, then call the number and repeat the
+   same thing: book a time and confirm it.
+2. If it breaks again, open Render → Logs and look for a line starting `UNHANDLED
+   REJECTION` or `UNCAUGHT EXCEPTION`. **That line now names the real cause** — the thing
+   we have been guessing at for two calls.
+3. Also check the diagnostics page for `failed` on a turn, and `serverStartedAt` to see
+   whether the server restarted again.
 
 **Where the last session stopped.** #29–#33 all shipped from live-call bug reports: email
 capture, the Charlotte rename, the missing date, corrections not winning, and tool failures
