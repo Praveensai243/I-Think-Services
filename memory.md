@@ -24,11 +24,35 @@ handoff doc for the whole project.
   timers, no self-watching PR loops, no agents left running. If a PR-activity subscription
   is created automatically, unsubscribe from it immediately. Do the work in the foreground,
   finish it, and hand it back — nothing keeps running after the reply.
-- **Keep replies short and direct, in simple words.** Lead with the answer or the action.
-  No long preambles, no restating the question, no exhaustive option surveys — give the
-  recommendation. Plain English over jargon; explain a technical term only if it changes
-  what the user should do. Said more than once — a wall of headings and tables is not a
-  good answer to a one-line question.
+- **Answer in plain words, then say what to do next. This has been said three times and
+  ignored three times — it is the most-broken rule in this file.**
+
+  Every reply has exactly two parts:
+  1. **The answer** — 1–3 sentences, plain English. What is going on, or what you did.
+  2. **Next steps** — a short numbered list. Each one an action the user can actually take:
+     which page to open, which button to click, what to look for, what to send back. If the
+     next step is the user's, say so. If it is yours, say what you will do.
+
+  Hard rules:
+  - **No tables of possibilities. No decision trees. No "if X then Y, if Z then W".** Pick
+    the most likely cause, say it, and say how to check it. One thing at a time.
+  - **No lists of everything you considered.** The user does not want your reasoning, only
+    your conclusion. Keep the thinking in your head.
+  - **No jargon.** Not "instrumentation", "transport layer", "in-memory counters",
+    "signature", "deterministic". Say "the page forgets everything when the server
+    restarts". If a technical word is unavoidable, explain it in the same sentence in
+    ordinary words.
+  - **Keep it under ~10 lines** unless the user asks for detail. Long is not thorough —
+    long means the user has to hunt for the answer.
+  - **Reporting work you shipped:** one line on what changed, one line on what it means for
+    the user. Not a changelog, not a list of files.
+  - **Do not restate the question, do not recap the history, do not apologise at length.**
+
+  Bad (what keeps happening): four paragraphs, a table of four possible causes, three
+  hypotheses, and the actual next step buried at the bottom.
+  Good: "The server restarted after your call, so the page lost everything. That's why it's
+  empty. Next: 1) Open Render → Events, check for a restart at the time you called.
+  2) Tell me if the plan is Free or Starter."
 
 ---
 
@@ -313,18 +337,26 @@ last update — update it when the state changes, not just when a task finishes.
 PR #12 (caller ID, chunked digits, inlined FAQ, `objective`) is merged — earlier roadmap
 text told you to merge it; ignore that, it's done.
 
-**Live call, 2026-08-19 (post-#33): the symptom came back.** The caller booked a time,
-confirmed it, and from then on heard a canned "I couldn't catch that, could you say it
-again?" on every turn whatever they said. Diagnostics afterwards showed
-`requestsToThisEndpoint: 0` and an empty trail — which the page wrongly read as "the
-assistant is not pointed at this server". It cannot be: the booking went through, so Vapi
-was reaching the brain. The zeros mean the **process restarted between the call and the
-check**, taking the evidence with it. Root cause still unknown; the open questions are
-whether Render restarted *during* the call (its Events tab and logs answer this, and they
-survive restarts) and whether the service is on Free (spins down) or Starter.
-**Note the wording:** that canned line is NOT ours any more — ours says "something went
-wrong on my end". A phrase we don't ship is Vapi filling silence, which points at our
-endpoint being slow, dead, or returning nothing.
+**Live call, 2026-08-19 — still broken, cause not found yet.**
+What happened: the caller booked a time, said "confirmed", and after that the agent said
+"I couldn't catch that, could you say it again?" to everything.
+
+What we know:
+- The booking worked, so the phone was talking to our server fine up to that point.
+- The diagnostics page was empty afterwards. That page forgets everything when the server
+  restarts, so the server restarted after the call. It is not proof that anything is
+  misconfigured — the page used to claim that, and it was wrong.
+- **That "couldn't catch that" line is not ours.** Ours says "something went wrong on my
+  end". So the phone system was talking over silence from us — our server was slow, dead,
+  or sent nothing back.
+
+Next steps for whoever picks this up:
+1. Render dashboard → **Events**: did the server restart while the call was happening?
+2. Render dashboard → **Logs** at the call time: look for an error, or the startup banner
+   ("AI receptionist") appearing mid-call. Render keeps logs through a restart.
+3. Check the Render plan. **Free** goes to sleep when idle and wakes slowly, which alone
+   could cause this. Starter ($7/mo) does not sleep. This is unconfirmed and worth
+   ruling out before writing any more code.
 
 **Where the last session stopped.** #29–#33 all shipped from live-call bug reports: email
 capture, the Charlotte rename, the missing date, corrections not winning, and tool failures
