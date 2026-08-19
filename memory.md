@@ -195,7 +195,7 @@ Cal.com: later.
 2b. **Get the number in front of one real local business.** The product answers calls and
    books to a real calendar; the bottleneck is now demand, not features. Recurring cost is
    stacking with zero revenue — don't add surface area ahead of a paying customer.
-3. **Website "Talk to Ava" widget** — DEFERRED. If built, it's a public metered endpoint →
+3. **Website "Talk to Charlotte" widget** — DEFERRED. If built, it's a public metered endpoint →
    MUST add rate-limiting/abuse protection first (else bots burn Claude/Vapi spend). It's
    polish, not the bottleneck; validate demand first.
 4. **Agency control-plane portal** — one login showing every client's usage + setup health;

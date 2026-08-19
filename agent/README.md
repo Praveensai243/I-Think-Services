@@ -179,7 +179,7 @@ I Think Services is an agency — so this engine is built to run **one client pe
 file**. Everything (persona, tools, availability, FAQ, Vapi config, demo chips) reads
 from a single JSON file; you never touch code to onboard a client.
 
-- **Your own line** is the default `business.config.json` — "Ava" answers prospects,
+- **Your own line** is the default `business.config.json` — "Charlotte" answers prospects,
   explains what you do, and books a **free demo**. Point your own number at it and it
   literally sells the service while demoing it.
 - **Client templates** live in `examples/` — ready-to-tweak configs for common local

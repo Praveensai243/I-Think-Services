@@ -3,8 +3,8 @@
   "industry": "AI solutions agency for local businesses",
   "timezone": "America/New_York",
   "phoneForHumans": "+1 (704) 387-9775",
-  "greeting": "Thanks for calling I Think Services, this is Ava. Are you looking to add an AI receptionist or automate something in your business?",
-  "agentName": "Ava",
+  "greeting": "Thanks for calling I Think Services, this is Charlotte. Are you looking to add an AI receptionist or automate something in your business?",
+  "agentName": "Charlotte",
   "objective": "book the caller a free AI demo and audit",
   "hours": {
     "mon": [
