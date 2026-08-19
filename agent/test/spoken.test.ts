@@ -40,12 +40,14 @@ test("booking without an email asks for one, once, after the fact", () => {
   assert.match(w, /once/i);
 });
 
-test("the first address given is read back", () => {
-  assert.match(confirmWording(1, "santoo@gmail.com"), /say out loud/);
+test("the first address given is spoken, but never put to the caller for approval", () => {
+  const w = confirmWording(1, "someone@gmail.com");
+  assert.match(w, /say where the confirmation is going/i);
+  assert.match(w, /do NOT ask them to confirm it/i);
 });
 
 test("a second address must not be read back again", () => {
-  const w = confirmWording(2, "santoo@gmail.com");
+  const w = confirmWording(2, "someone@gmail.com");
   assert.match(w, /do NOT spell the address out again/);
   assert.match(w, /confirm by phone/, "there has to be a way out that is not another read-back");
 });

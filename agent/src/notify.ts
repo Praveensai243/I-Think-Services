@@ -141,7 +141,9 @@ export function buildIcs(b: BookingConfirmation): string {
     `PRODID:-//${business.name}//AI Receptionist//EN`,
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
-    `UID:${b.id}@ithinkservices.net`,
+    // Derived, never hardcoded: this file ships to every client's callers, so
+    // one agency's domain must not turn up in another business's invitations.
+    `UID:${b.id}@${icsDomain()}`,
     `DTSTAMP:${icsStamp(new Date().toISOString())}`,
     `DTSTART:${icsStamp(b.startISO)}`,
     `DTEND:${icsStamp(b.endISO)}`,
@@ -221,6 +223,17 @@ export interface CallRecord {
   booked: { name: string; service: string; startISO: string }[];
   /** "Caller: …" / "Charlotte: …" lines, oldest first. */
   lines: string[];
+}
+
+/**
+ * The domain that identifies a calendar entry. Taken from the sending address
+ * so it belongs to whoever is running this deploy; a neutral fallback keeps the
+ * .ics valid when no SMTP is configured at all.
+ */
+function icsDomain(): string {
+  const from = env.smtp.from || env.smtp.user || "";
+  const at = from.lastIndexOf("@");
+  return at > 0 ? from.slice(at + 1).replace(/[>\s]/g, "") : "ai-receptionist.local";
 }
 
 function transcriptEmail(c: CallRecord): { subject: string; text: string } {
