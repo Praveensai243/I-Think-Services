@@ -41,10 +41,19 @@ function zonedToUtc(y: number, m: number, d: number, hh: number, mm: number, tz:
   const guess = Date.UTC(y, m - 1, d, hh, mm, 0);
   return new Date(guess - tzOffset(new Date(guess), tz));
 }
+/**
+ * A slot the way a receptionist says it out loud — with the DATE in it.
+ *
+ * "Thursday at 2:30" is ambiguous the moment more than one Thursday is on
+ * offer, and the agent had no other way to tell them apart: it only saw a
+ * weekday and a raw ISO timestamp. Naming the date lets it confirm the right
+ * day back to the caller and match "the twenty-first" to the right slot.
+ */
 function labelFor(startISO: string): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: business.timezone,
-    weekday: "long", hour: "numeric", minute: "2-digit", hour12: true,
+    weekday: "long", month: "long", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
   }).format(new Date(startISO));
 }
 const DOW = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
