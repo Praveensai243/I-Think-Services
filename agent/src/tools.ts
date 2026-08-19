@@ -179,7 +179,7 @@ export async function runTool(
       recordAction("book_appointment", true);
       bookingLog.unshift({
         id: r.booking!.id, name: r.booking!.name, phone: r.booking!.phone, service: r.booking!.service,
-        startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "booked",
+        startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "booked", sessionId,
       });
       // What the transcriber heard is not what the caller said: a spelled "oh"
       // comes back as a zero. Repair it before it reaches the confirmation.
@@ -211,7 +211,7 @@ export async function runTool(
       recordAction("reschedule_appointment", true);
       bookingLog.unshift({
         id: r.booking!.id, name: r.booking!.name, phone: r.booking!.phone, service: r.booking!.service,
-        startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "rescheduled",
+        startISO: r.booking!.startISO, at: new Date().toISOString(), source, action: "rescheduled", sessionId,
       });
       return { ok: true, confirmation: r.booking!.id, when: r.booking!.startISO, service: r.booking!.service };
     }
@@ -221,7 +221,7 @@ export async function runTool(
       recordAction("cancel_appointment", true);
       bookingLog.unshift({
         id: "-", name: String(input.name ?? ""), phone: String(input.phone ?? ""), service: "",
-        startISO: "", at: new Date().toISOString(), source, action: "cancelled",
+        startISO: "", at: new Date().toISOString(), source, action: "cancelled", sessionId,
       });
       return { ok: true };
     }

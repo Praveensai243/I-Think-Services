@@ -422,6 +422,18 @@ of every bug in the last three calls. A bad address now costs nothing: the appoi
 already made. In code, `tools.ts` counts **emails per call, not bookings**, so the address
 is read back exactly once.
 
+**Call transcripts by email — LIVE ✅ (#39).** Every finished call emails the team the full
+transcript, the caller's number (in the subject, readable from a lock screen), the length,
+why it ended, and what was booked. Fires from Vapi's `end-of-call-report` webhook, so
+**the assistant's Server URL must be set in the Vapi dashboard** to
+`https://ithink-ai-agent.onrender.com/api/vapi/function` — without it Vapi sends no report
+and no email arrives. Prefers Vapi's own transcript; falls back to the turns we recorded
+ourselves, so a call is never reported with nothing to read. Rides the same SMTP as the
+message alerts.
+
+**Timing after the four-exchange rewrite: ~3 minutes, down from 3–5.** The turn count is
+now near the floor; what is left is the per-turn wait, and that is streaming.
+
 **Streaming is still the real fix for silence** and is still NOT done. Read the `tookMs`
 numbers from a real call first, then ship it alone per the #10 rule.
 
