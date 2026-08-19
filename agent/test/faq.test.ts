@@ -70,13 +70,19 @@ test("the system prompt stays inside its latency budget", () => {
 // wrong one fails silently — the caller just never gets the confirmation.
 test("email capture has a give-up rule", () => {
   const p = systemPrompt();
-  assert.match(p, /TWO halves/);
+  // The email is no longer taken in two halves before booking — it is asked
+  // for ONCE, after the appointment is already made. Taking it up front was
+  // costing four exchanges and several minutes on a two-minute call.
+  assert.match(p, /only AFTER the appointment is booked/i);
   assert.match(p, /gmail dot com/);
   // The rule got STRICTER: read back once, then give up and book without it.
   // Two failed tries was already one too many for a caller spelling letters
   // into a phone.
   assert.match(p, /Read it back ONCE/i);
-  assert.match(p, /book without the address/i);
+  // The give-up is now stronger than "book without it": the appointment is
+  // already made before the address is ever asked for, so a bad address costs
+  // the caller nothing.
+  assert.match(p, /the appointment stands/i);
 });
 
 // Without the current date the agent cannot resolve "tomorrow" or "next

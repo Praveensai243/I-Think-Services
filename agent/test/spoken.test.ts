@@ -34,11 +34,17 @@ test("spoken 'at' and 'dot' and spelled-out spacing become an address", () => {
 // correction, and the caller is stuck confirming an appointment that is already
 // booked.
 
-test("the first booking reads the address back", () => {
+test("booking without an email asks for one, once, after the fact", () => {
+  const w = confirmWording(0);
+  assert.match(w, /Booked/);
+  assert.match(w, /once/i);
+});
+
+test("the first address given is read back", () => {
   assert.match(confirmWording(1, "santoo@gmail.com"), /say out loud/);
 });
 
-test("the second booking must not ask the caller to confirm again", () => {
+test("a second address must not be read back again", () => {
   const w = confirmWording(2, "santoo@gmail.com");
   assert.match(w, /do NOT spell the address out again/);
   assert.match(w, /confirm by phone/, "there has to be a way out that is not another read-back");
