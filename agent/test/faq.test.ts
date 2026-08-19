@@ -72,7 +72,11 @@ test("email capture has a give-up rule", () => {
   const p = systemPrompt();
   assert.match(p, /TWO halves/);
   assert.match(p, /gmail dot com/);
-  assert.match(p, /two tries\? STOP/i);
+  // The rule got STRICTER: read back once, then give up and book without it.
+  // Two failed tries was already one too many for a caller spelling letters
+  // into a phone.
+  assert.match(p, /Read it back ONCE/i);
+  assert.match(p, /book without the address/i);
 });
 
 // Without the current date the agent cannot resolve "tomorrow" or "next
@@ -94,7 +98,10 @@ test("the prompt states the current date", () => {
 test("a correction overrides earlier attempts", () => {
   const p = systemPrompt();
   assert.match(p, /A correction kills every earlier version/);
-  assert.match(p, /o as in Oscar/);
+  assert.match(p, /only the LAST thing the caller confirmed/i);
+  // A mis-heard letter now arrives as a DIGIT, so the rule has to name that:
+  // "o as in Oscar" never helped, because the damage was already in the text.
+  assert.match(p, /digit inside a spelled name is a LETTER/i);
 });
 
 // ── the half we cache must never move ──────────────────────────────
