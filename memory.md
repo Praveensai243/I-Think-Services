@@ -100,9 +100,9 @@ paths under `/api/vapi` now 404 with an explanation instead of silently.
 - Fill the transfer tool's **"Message to Customer"**; we deliberately send no words of our
   own on a transfer turn (see below), so that field is what the caller hears.
 - Transcriber: Deepgram Nova 2 Phonecall. First Message: the real greeting, not "Hello."
-- The Custom LLM entry in Vapi is named **"Charlotte"** — that is a dashboard label only.
-  The agent introduces herself as **Ava** (`agentName` in `business.config.json`); don't
-  "fix" one to match the other without asking.
+- The agent is **Charlotte** everywhere now (#30) — `agentName`, the greeting, and the Vapi
+  entry all agree. If a caller ever hears "Ava", it is Vapi's own **First Message** field
+  holding an old hardcoded greeting; our backend no longer says it anywhere.
 
 **Talking to Vapi — three rules learned the hard way:**
 1. **Tool names come from the dashboard**, e.g. `transfer_call_tool`, not `transferCall`.
@@ -145,6 +145,33 @@ in one tap. Deliberately NOT done by adding them as a Google attendee: a service
 cannot send invitations without domain-wide delegation, and chasing that would trade a
 working booking for a Google admin project. Rides the same SMTP as message alerts, so no
 SMTP means no confirmation — the booking still succeeds.
+
+**⚠️ "Sorry, I didn't catch that" is OUR ERROR STRING, not a hearing problem.** If a caller
+reports the agent saying it over and over whatever they say, the backend is throwing on
+every turn — go to the logs, not the transcriber. This wording cost a whole live call
+because it made a server crash look like bad audio; it now says "something went wrong on my
+end" and gives the human number. **Any canned fallback must sound like what it actually is.**
+
+**Tool failures are reported, never thrown (#33).** `runTool` had no error handling at all,
+so one bad response from Google Calendar or SMTP killed the whole turn — and because the
+agent retried the same tool on the caller's next words, the call was stuck repeating the
+error forever. A throwing tool now comes back as a result telling the agent to apologise,
+NOT retry, and offer a message or a person. `notifyBooking` never throws either: the
+appointment is already saved by the time the confirmation is built.
+
+**Three bugs found on live calls in one session, all invisible from the code alone:**
+1. **The prompt never said what day it was** (#31). The agent could not resolve "tomorrow"
+   or "next Tuesday" and fell back on its training's idea of today. Slot labels also named a
+   weekday with no date, so two Thursdays were indistinguishable. Both fixed; a test now
+   asserts the prompt names today's real date.
+2. **A corrected detail did not win** (#32). A caller spelled their email out, the agent read
+   it back correctly, then booked an earlier wrong version it was still holding — so this was
+   never a transcriber problem. The prompt now says a correction kills every earlier version,
+   and `book_appointment` makes the agent **say the address it actually used out loud**, which
+   is the part that catches it while the caller is still on the line.
+3. **Emails are worse than phone numbers to take by ear** (#29). Taken in two halves, domain
+   guessed rather than spelled, and a hard stop after two failed tries — book without it
+   rather than grind the caller down.
 
 **Guards that live in code, not in the prompt.** Each was added after a prompt rule failed
 on a live call — Haiku is fast but does not reliably honour a negative instruction buried
@@ -214,6 +241,13 @@ swapping it is a dropdown change, so nothing is stranded by testing on the free 
   a live call needed ten repeats before this. When digits must be taken by ear: chunked, read
   back per chunk, single unclear digit queried alone, and after two failures stop asking and
   take a message. **A frustrated caller who hangs up is worse than a note with a gap.**
+- **The system prompt has a latency budget, enforced by a test (~4k tokens).** The whole FAQ
+  ships in it on EVERY turn, so every line is paid for on everything the caller says. When
+  the test trips, **tighten wording or merge entries — do not raise the ceiling.** It has
+  already caught one careless addition.
+- **Read the diagnostics before theorising.** `/api/admin/diagnostics?token=…` shows the last
+  50 turns: what the caller said, what the agent decided, what we sent Vapi. Several rounds
+  of this project were lost to guessing from the symptom when the answer was one URL away.
 - **Ship voice changes one at a time.** #10 bundled two changes, broke the phone, and cost
   us the ability to tell which one did it. The **SSE transport is the danger zone** — a bug
   there produces silence, not a bad answer, and silence is the one failure a caller cannot
@@ -268,6 +302,17 @@ revert and GitHub called it a conflict. Fix is a rebase onto `main`, not a merge
 three days because the handoff doc didn't mention it. `memory.md` is only as good as its
 last update — update it when the state changes, not just when a task finishes.
 
-**State as of 2026-08-19: no open PRs. Everything through #27 is merged and deployed.**
+**State as of 2026-08-19: no open PRs. Everything through #33 is merged and deployed.**
 PR #12 (caller ID, chunked digits, inlined FAQ, `objective`) is merged — earlier roadmap
 text told you to merge it; ignore that, it's done.
+
+**Where the last session stopped.** #29–#33 all shipped from live-call bug reports: email
+capture, the Charlotte rename, the missing date, corrections not winning, and tool failures
+killing the turn. **None of them has been verified on a call yet** — the user was going to
+test after #33 deployed. Start by asking how that call went, and ask for
+`/api/admin/diagnostics?token=…` if anything is still wrong rather than guessing.
+
+**Still unfixed and still the top complaint: the agent goes silent while it works.** It
+cannot say "bear with me" first, because we send one reply after all the work is done — the
+words and the wait are inseparable without streaming. Do **prompt caching first** (cheap, no
+transport risk), and only then retry streaming, alone, per the #10 post-mortem.
