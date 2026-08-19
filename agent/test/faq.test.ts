@@ -72,7 +72,7 @@ test("email capture has a give-up rule", () => {
   const p = systemPrompt();
   assert.match(p, /TWO halves/);
   assert.match(p, /gmail dot com/);
-  assert.match(p, /after two tries, STOP/i);
+  assert.match(p, /two tries\? STOP/i);
 });
 
 // Without the current date the agent cannot resolve "tomorrow" or "next
@@ -85,4 +85,14 @@ test("the prompt states the current date", () => {
   }).format(new Date());
   assert.ok(p.includes(today), `prompt must name today (${today}) — it does not`);
   assert.match(p, /never from anything you think you know about the date/i);
+});
+
+// A live call: the caller spelled the email out, the agent read it back
+// correctly, then booked an earlier wrong version it was still holding. The
+// last confirmed value has to win, and the booked address has to be spoken so
+// a wrong one is caught while the caller is still on the line.
+test("a correction overrides earlier attempts", () => {
+  const p = systemPrompt();
+  assert.match(p, /A correction kills every earlier version/);
+  assert.match(p, /o as in Oscar/);
 });

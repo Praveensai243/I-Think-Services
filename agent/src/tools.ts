@@ -155,8 +155,12 @@ export async function runTool(
         ok: true, confirmation: r.booking!.id,
         when: new Date(r.booking!.startISO).toISOString(),
         service: r.booking!.service,
+        // Say the address that was actually used. The agent can hold several
+        // attempts at one email and book an earlier, wrong one; speaking the
+        // value back is the only thing that catches that while the caller is
+        // still on the line.
         confirm: email
-          ? "Read the day and time back, and say a confirmation email is on its way."
+          ? `Read the day and time back, then say out loud where the confirmation is going — say "${email}" as words, like "santoo dot saipraveen at gmail dot com". If the caller says that is wrong, take the correct address and call book_appointment again with the SAME start_iso; the slot is already theirs.`
           : "Read the day and time back. They have NO written record — ask once for an email to send a confirmation to.",
       };
     }
