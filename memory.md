@@ -183,6 +183,14 @@ provider: `SMTP_HOST/PORT/USER/PASS/FROM` + `NOTIFY_EMAIL`. Keyless-safe — wit
 configured it logs and the call still completes. This email is also the only durable copy
 of a message until there is a database.
 
+**Lead alerts on every booking — LIVE ✅ (#42).** A booking now sends **two separate
+emails**: the team gets its own alert (subject `New booking: Name (phone) — Service`, body
+with the time, phone, email or "not given", and the booking ref), and the caller gets their
+confirmation only if they gave an address. Before this the team was merely CC'd on the
+caller's receipt — "Hi Sai, you're booked for…" — which carries **no phone number**, so
+whenever a caller gave an email the lead arrived with the one thing the business needs
+missing. Both emails carry the .ics.
+
 **Booking confirmations — LIVE ✅.** `book_appointment` takes an optional email and the
 agent asks for it once before booking. The caller gets a confirmation with the time in
 their own local wording plus an **.ics attachment** that adds it to Google/Apple/Outlook
