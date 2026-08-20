@@ -193,23 +193,44 @@ function sendBookingEmail(b: BookingConfirmation): void {
     console.log("booking made but no SMTP configured — not emailed:", b.name);
     return;
   }
-  const { subject, text } = confirmationEmail(b);
   const ics = { filename: "appointment.ics", content: buildIcs(b), contentType: "text/calendar; method=REQUEST" };
+  const transport = getTransport();
 
-  // The caller gets the confirmation; the team gets told either way, so a
-  // booking taken without an email address still reaches somebody.
-  const to = b.email || env.smtp.to;
-  getTransport()
+  // TWO separate emails, deliberately.
+  //
+  // The team used to be CC'd on the caller's confirmation, which reads "Hi
+  // Sai, you're booked for…" — a customer's receipt, with no phone number on
+  // it. That is not a lead alert: the one thing the business needs from a
+  // booking is who to ring, and it was the one thing missing whenever the
+  // caller gave an email. The team now always gets its own copy, with every
+  // detail on it, whether or not an address was taken.
+  const at = when(b.startISO);
+  transport
     .sendMail({
       from: env.smtp.from || env.smtp.user,
-      to,
-      cc: b.email ? env.smtp.to : undefined,
-      subject: b.email ? subject : `New booking: ${b.name} (${b.phone}) — ${b.service}`,
-      text: b.email ? text : `${b.name} booked ${b.service}.\nPhone: ${b.phone}\nNo email given, so they have no confirmation.`,
+      to: env.smtp.to,
+      subject: `New booking: ${b.name} (${b.phone}) — ${b.service}`,
+      text: [
+        `${b.name} booked ${b.service}.`,
+        "",
+        `When:  ${at} (${business.timezone})`,
+        `Phone: ${b.phone}`,
+        `Email: ${b.email ?? "not given — call them, they have no written confirmation"}`,
+        `Ref:   ${b.id}`,
+        "",
+        `— ${business.agentName}, ${business.name}`,
+      ].join("\n"),
       attachments: [ics],
     })
-    .then(() => console.log("booking emailed:", subject))
-    .catch((err) => console.error("could not email the booking:", err));
+    .then(() => console.log("team told about the booking:", b.name))
+    .catch((err) => console.error("could not email the team about the booking:", err));
+
+  if (!b.email) return;
+  const { subject, text } = confirmationEmail(b);
+  transport
+    .sendMail({ from: env.smtp.from || env.smtp.user, to: b.email, subject, text, attachments: [ics] })
+    .then(() => console.log("caller confirmation emailed:", subject))
+    .catch((err) => console.error("could not email the caller's confirmation:", err));
 }
 
 
