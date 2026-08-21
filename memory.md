@@ -307,6 +307,19 @@ swapping it is a dropdown change, so nothing is stranded by testing on the free 
   work around. Logic/prompt changes are cheap and safe; transport changes ship alone, and
   **always test by calling the number after deploy.**
 
+## 6b. Onboarding a client — `agent/ONBOARDING.md`
+The 2–3 hour delivery checklist: collect their details → `npm run new-client` → write the
+FAQ → their own Render service → a calendar → their Vapi assistant → five tests including a
+real call. **90 minutes of it is writing their FAQ; the rest is a checklist.**
+
+**One deploy serves ONE business.** `BUSINESS_CONFIG` is read once at startup, so each
+client needs their own Render service (~$7/mo) plus a number (~$2/mo). Fine for the first
+handful; past about five it wants the multi-tenant routing in §7.4.
+
+**Say these limits out loud before taking money:** Google Calendar only (Vagaro / Booksy /
+Jobber / Housecall are NOT integrated); everything is in memory so bookings and minutes
+reset on every deploy — the emails are the durable record; inbound only.
+
 ## 7. Deferred / roadmap (do later, in this order)
 0. ~~Get the phone answering~~ **DONE** — live, taking real calls.
 1. **Latency is the last thing standing between this and a sellable demo.** The caller waits

@@ -38,15 +38,20 @@ async function main() {
   const name = await ask("Business name?", "Acme Services");
   const industry = await ask("Industry (e.g. dental clinic, hair salon)?", "local business");
   const timezone = await ask("Timezone?", "America/New_York");
-  const agentName = await ask("Receptionist's name?", "Ava");
+  const agentName = await ask("Receptionist's name?", "Alex");
   const phone = await ask("Number to transfer humans to?", "+1 (000) 000-0000");
   const greeting = await ask(
     "Greeting?",
     `Thanks for calling ${name}, this is ${agentName}. How can I help you today?`,
   );
+  // The one line that turns a polite question-answerer into something that asks
+  // for the business. Prompted for here because a config written without it
+  // quietly ships an agent that never closes.
+  const objective = await ask("What does a good call achieve? (e.g. book the job)", "book an appointment");
+  const notifyEmail = await ask("Which email gets bookings and messages?", "owner@example.com");
 
   const config = {
-    name, industry, timezone, agentName,
+    name, industry, timezone, agentName, objective,
     phoneForHumans: phone,
     greeting,
     hours: {
@@ -58,10 +63,18 @@ async function main() {
       { id: "appointment", name: "Appointment", minutes: 30 },
       { id: "consult", name: "Consultation", minutes: 45 },
     ],
+    // The FAQ IS the product: it ships inside the prompt, so the agent answers
+    // instantly instead of looking anything up, and it will never guess at a
+    // question that is not in here. Twenty to forty entries, in spoken English.
     faq: [
-      { q: "hours", a: "Our hours are Monday to Friday, 9 to 5." },
-      { q: "location", a: "EDIT ME — add your address here." },
-      { q: "pricing", a: "EDIT ME — add pricing info here." },
+      { q: "hours", a: "EDIT ME — say the hours the way a person would." },
+      { q: "location", a: "EDIT ME — address, and where to park." },
+      { q: "pricing", a: "EDIT ME — what things cost, or how you quote." },
+      { q: "how long does an appointment take", a: "EDIT ME" },
+      { q: "do you offer emergency or same-day service", a: "EDIT ME" },
+      { q: "what areas do you cover", a: "EDIT ME" },
+      { q: "how do I pay", a: "EDIT ME" },
+      { q: "cancellation policy", a: "EDIT ME" },
     ],
     escalation: {
       toHumanWhen: ["the caller is upset or asks for a manager", "a billing or account issue", "anything beyond scheduling"],
@@ -81,10 +94,13 @@ async function main() {
   rl?.close();
 
   console.log(`\n  ✓ Wrote clients/${slug}.json`);
-  console.log("  Next:");
-  console.log(`    1. Edit clients/${slug}.json — fill in services, FAQ, and hours.`);
-  console.log(`    2. Run it:   BUSINESS_CONFIG=clients/${slug}.json npm start`);
-  console.log(`    3. Connect their calendar + phone number (see README).\n`);
+  console.log(`    Bookings and messages will go to: ${notifyEmail} (set NOTIFY_EMAIL to it)`);
+  console.log("\n  Next — the full checklist is in agent/ONBOARDING.md:");
+  console.log(`    1. Fill in services, hours, and the FAQ in clients/${slug}.json.`);
+  console.log("       The FAQ is the product — 20 to 40 entries, in spoken English.");
+  console.log(`    2. Try it:   BUSINESS_CONFIG=clients/${slug}.json npm start`);
+  console.log("    3. npm test — the prompt must stay inside its latency budget.");
+  console.log("    4. Their own Render service, calendar, and Vapi assistant (ONBOARDING.md).\n");
 }
 
 main();
