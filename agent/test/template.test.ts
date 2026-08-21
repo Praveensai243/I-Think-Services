@@ -38,6 +38,10 @@ test("every example client has the fields the prompt needs", async () => {
   const needed = [
     "name", "industry", "timezone", "phoneForHumans", "greeting", "agentName",
     "hours", "slotMinutes", "services", "faq", "escalation",
+    // Without an objective the agent is a polite question-answerer that never
+    // asks for the business. A client config copied from an example that lacks
+    // it ships that way and nobody notices until the calls do not convert.
+    "objective",
   ];
   for (const file of readdirSync("examples").filter((f) => f.endsWith(".json"))) {
     const cfg = JSON.parse(readFileSync(`examples/${file}`, "utf8"));
