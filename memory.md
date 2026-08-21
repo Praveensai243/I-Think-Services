@@ -337,6 +337,17 @@ reset on every deploy — the emails are the durable record; inbound only.
    polish, not the bottleneck; validate demand first.
 4. **Agency control-plane portal** — one login showing every client's usage + setup health;
    needs a multi-tenant DB + routing calls by phone number. (User: "circle back later.")
+4b. **Client outreach at scale — see `OUTREACH.md` at the repo root.** Phased: prove the
+   message by hand on 50 businesses FIRST (kill criteria: under 3 replies in 50 means the
+   message is wrong, not the channel), then the contact list, then a separate sending
+   domain, then automation in n8n.
+   **⚠️ Read receipts were asked for and do NOT work.** Real read receipts (MDN) are a
+   request clients ignore, and asking gets flagged as spam. Tracking pixels are noise since
+   Apple Mail Privacy Protection pre-loads every image whether or not anyone looks — and the
+   pixel itself is a spam signal, so it trades deliverability for a number you cannot trust.
+   **Measure bounces and replies. Never send cold mail from `ithinkservices.net`** — it
+   carries the booking confirmations, and getting it flagged breaks a client's customers'
+   confirmations.
 5. **Outbound calling (~50 calls/day, B2B, leads from web, to book demos)** — DEFERRED and
    **compliance-critical**: AI voice = robocall under FCC/TCPA; cold-calling scraped consumer
    lists risks **$500–$1,500 per call**. Do it as **landline-only B2B** (line-type filter),
