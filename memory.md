@@ -86,7 +86,18 @@ to a human when needed.
 - **Marketing website** — static HTML/CSS/JS at repo root (`index/services/about/
   contact.html`, `css/styles.css`, `js/main.js`). Hosted on **Cloudflare** Pages/Workers,
   deploys from `main`. Domain: ithinkservices.net.
-- **Agent backend** — the `agent/` folder. Node/TypeScript (Express + `@anthropic-ai/sdk` +
+- **⭐ THE PRODUCT: a Grok voice agent (2026-08-24 — replaced Render + Vapi).** No server,
+  no deploy, no code. The agent lives in xAI's Voice Agent Builder; what we own is in
+  `grok/`: `agent-instructions.md` (66 lines, every one of them earned on a live call),
+  `knowledge.md` (the FAQ), `first-message.txt`. Booking is Grok's Google Calendar
+  connector; transcripts are its own call review. **Client delivery: `ONBOARDING.md`.**
+  Per client: one agent + one number + their calendar. ~$0.06/min all-in, no fixed cost.
+  - **Why we moved:** margin (~85% vs ~65% per client), speech-to-speech removes the
+    silence our pipeline could not, and it deletes two vendors. Full reasoning in §6/§8a.
+  - **Suspend Render and Vapi rather than deleting them** — `agent/` is the fallback and
+    the answer for clients needing a real integration. Nothing durable is lost either way:
+    everything in that backend was in memory and reset on each deploy.
+- **Agent backend (FALLBACK, no longer the live product)** — the `agent/` folder. Node/TypeScript (Express + `@anthropic-ai/sdk` +
   googleapis + stripe + zod), run with `tsx`. Hosted on **Render** at
   **https://ithink-ai-agent.onrender.com**, auto-deploys from `main`.
   - **Brain = Claude**, and the backend *is* the brain: it exposes an OpenAI-compatible
