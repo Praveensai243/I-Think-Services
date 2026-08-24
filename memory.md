@@ -297,6 +297,25 @@ swapping it is a dropdown change, so nothing is stranded by testing on the free 
   fixes the PAUSES, not the FLOW, and re-platforming mid-frustration is how two weeks
   disappear. **Evaluate before migrating:** 30 minutes in the Voice Agent Builder with our
   own FAQ, and judge it by making a call.
+  **✅ We do NOT have to leave Vapi to get speech-to-speech.** Vapi supports native
+  speech-to-speech assistants (OpenAI Realtime is documented and live in their dashboard;
+  Grok is already a Vapi voice partner and its API is OpenAI-Realtime-compatible) as a
+  MODE, distinct from its usual transcriber → model → voice pipeline. So the test is a
+  config change on the assistant we already have, on the number we already have — not a
+  migration. **Confirm in the Vapi dashboard which realtime models are selectable.**
+  **What changes if we switch the assistant to speech-to-speech:**
+  - KEPT: the number, `/api/vapi/function` (it already serves Vapi tool calls), the booking
+    tools, calendar, the emails, and the per-client config template.
+  - MOVED: the system prompt and the FAQ go into the assistant's session config instead of
+    our custom-LLM endpoint. Still ours, still per-client.
+  - LOST: every guard that lives in our turn loop, because we stop being the brain — the
+    hang-up guard, the force-transfer-after-two-asks rule, the empty-turn fallback, the turn
+    deadline. Each was added after a live call went wrong. Some can be rebuilt tool-side;
+    "never hang up unless the caller signed off" cannot. **Re-test all of them.**
+  **Grok specifics (verified 2026-08-24):** ~$0.05/min ("Think Fast 2.0" ~$0.08), plus
+  ~$0.01/min if using their number; <1s to first audio; 30-min max session; **beta, and
+  access is gated — developers report 403s.** Reported concurrency limits conflict across
+  sources (10 vs 100 per team) — check before promising a client anything.
 - **Voice platform: start on Vapi** (already integrated + deployed + working). **Retell is
   the upgrade path** (more reliable ~99.9% vs ~99.5%, lower out-of-box latency, managed);
   switching later ≈ a URL change because our backend is a portable custom-LLM. **Bland** only
@@ -381,6 +400,19 @@ reset on every deploy — the emails are the durable record; inbound only.
 Render Starter ~$7/mo · Vapi ~$0.05/min · number ~$2/mo · Claude cents/call · ElevenLabs
 later. Recurring cost is stacking with zero revenue — **validate that someone will pay
 before adding more surface area/cost.**
+
+## 8b. Does a 2-minute no-code builder kill this business? No.
+Grok's Voice Agent Builder makes a working agent in about two minutes, and the whole stack
+(STT, LLM, TTS, telephony) is now off-the-shelf. That commoditises the DEMO, not the job.
+**The market prices the job, not the tool:** agencies serving local businesses charge
+roughly **$500–$1,500 setup + $200–$500/mo**, and the hidden cost of the DIY route is
+**40–80 hours of the owner's own time**. A plumber will not spend that.
+**Our own week is the proof and the sales story:** a working agent took minutes; an agent
+that does not embarrass you on a live call took eight rounds of fixes found only by ringing
+it — the email spelling loop, the silence after a tool call, the missing goodbye, the
+10-turn booking. **What a client buys is the conversation design, the booking integration,
+the testing against real callers, and an accountable human when it breaks.** Never sell the
+model; sell the calls that get answered.
 
 ## 9. How pricing/reselling works (for client conversations)
 Setup fee ($250–$1,500) + monthly tiers with included minutes (Starter ~$99–199, Pro
