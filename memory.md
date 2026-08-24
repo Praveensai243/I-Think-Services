@@ -430,6 +430,26 @@ FAQ, exported from `business.config.json` so it cannot drift), `first-message.tx
 `README.md` (build steps plus a **10-row acceptance test**). Rows 4, 7, 8 and 9 — no email
 read-back, connect on the second ask, never hang up on a question, a proper goodbye — are
 the ones that cost us real calls on the old stack and are the likeliest to fail on a new one.
+**STATUS 2026-08-24: the Grok demo works end to end.** Three test calls got it there:
+answers questions from the knowledge base without searching the web, checks the real
+Google Calendar, offers real times, honours "what about tomorrow" and "what about ten
+thirty", books, sends a Meet invite, and ends the call only after the caller signs off.
+The booking lands on the connected calendar. **This is demo-ready — put the number in
+front of a business.**
+- **The email is deliberately GONE from the demo flow.** Taking an address by ear broke
+  three calls in a row (dropped separators, 40-second correction loops, invites to wrong
+  addresses). The agent books with the name and the number already on caller ID. The
+  instructions went from 149 lines to 66 by deleting that whole problem rather than adding
+  a fourth rule to manage it. **Do not add it back for a demo.**
+- **Watch which Google account the calendar connector is signed into.** The first booking
+  appeared to vanish: it had gone to the account the connector was authorised as, not the
+  one being checked. Google silently reuses whatever account the browser is logged into —
+  connect it in an incognito window. **On a client, the connector must be on THEIR
+  calendar.** This will bite on every onboarding.
+- Earlier failures now fixed by instruction, worth re-testing on any platform: it invented
+  a booking when it could not reach the calendar; it fired the transfer tool as if it were
+  a lookup; it asserted a fact and admitted uncertainty about it in the same sentence.
+
 **Rule for the test: Grok ONLY — nothing of ours connected.** No Render, no Vapi, no custom
 API or MCP pointing at our server. Booking via Grok's Google Calendar connector, confirmations
 via its email connector, transcripts via its own call review. If our backend is in the loop
