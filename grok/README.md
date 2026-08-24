@@ -6,6 +6,25 @@ instructions field), `knowledge.md` (upload as the knowledge base), `first-messa
 
 ---
 
+## Rule for this build: Grok ONLY. Nothing of ours is connected.
+
+**Do not wire our backend into this agent.** No Render, no Vapi, no custom API, no MCP
+pointing at `ithink-ai-agent.onrender.com`. Booking goes through Grok's own Google Calendar
+connector; confirmations through its email connector; transcripts through its own call
+review.
+
+The reason is the whole point of the test: if any of our stack is in the loop and a call
+goes wrong, we cannot tell whether Grok is at fault or we are — and we would be back to
+guessing, which is what cost us most of a week. **A clean result is worth more than a
+feature.** This is the same rule as "ship voice changes one at a time"; it failed us once
+already when two changes went out together and broke the phone.
+
+If something can only be done by calling our server, **leave it out of this test and write
+it down** as a gap. That list is the real output of the exercise: it tells us exactly what
+Grok alone cannot do, which is the thing we actually need to know before selling on it.
+
+---
+
 ## What I need from you
 
 Only four things, and none of them take long. **Everything else is written below.**
@@ -34,7 +53,7 @@ far harder than hearing ours.
 4. **First message**: paste `first-message.txt`. Not "Hello."
 5. **Voice**: pick a warm American English voice. Listen to two or three; this is the first
    thing a caller judges.
-6. **Connectors**:
+6. **Connectors** (Grok's own — never ours):
    - **Google Calendar** on `contact@ithinkservices.net`, with Create Event enabled.
      Bookings are 30 minutes, or 45 for a technical deep-dive.
    - **Gmail / email** for the confirmation to the caller, and — importantly — **an alert to

@@ -430,6 +430,13 @@ FAQ, exported from `business.config.json` so it cannot drift), `first-message.tx
 `README.md` (build steps plus a **10-row acceptance test**). Rows 4, 7, 8 and 9 — no email
 read-back, connect on the second ask, never hang up on a question, a proper goodbye — are
 the ones that cost us real calls on the old stack and are the likeliest to fail on a new one.
+**Rule for the test: Grok ONLY — nothing of ours connected.** No Render, no Vapi, no custom
+API or MCP pointing at our server. Booking via Grok's Google Calendar connector, confirmations
+via its email connector, transcripts via its own call review. If our backend is in the loop
+and a call goes wrong we cannot tell whose fault it is, and we are back to guessing — which
+is what cost most of a week. Anything that can only be done by calling our server is **left
+out and written down as a gap**; that gap list is the real output, because it is exactly what
+Grok alone cannot do.
 **Blocked on four things only a human can do:** beta access to the Builder, the Google OAuth
 click-through for the calendar, buying/attaching the number, and making the test call.
 
