@@ -401,6 +401,29 @@ Render Starter ~$7/mo · Vapi ~$0.05/min · number ~$2/mo · Claude cents/call �
 later. Recurring cost is stacking with zero revenue — **validate that someone will pay
 before adding more surface area/cost.**
 
+## 8a. ⚠️ SIMPLIFY THE STACK — Grok alone can do the whole job (verified 2026-08-24)
+Three vendors for one phone line (Render + Vapi + a model) is more moving parts than this
+product needs, and every one of them has cost us a live call. **Grok's Voice Agent Builder
+covers all of it:** phone numbers (or bring your own over SIP), speech-to-speech brain and
+voice, knowledge/RAG for the FAQ, **native Google Calendar and Gmail connectors** for
+booking and confirmations, custom APIs and MCP for anything else, and built-in call review
+for transcripts. So for a normal receptionist — answer, book, take a message, transfer,
+email a confirmation — **Render and Vapi and our backend are all optional.**
+
+**Recommended: build the next test agent Grok-only, and pilot on it.** Cheaper per client
+too (no $7/mo Render each), and speech-to-speech removes the silence structurally.
+
+**Do NOT delete anything yet.** Keep the repo running until a Grok-built agent has survived
+a real call, because:
+- It is in **beta**, access is gated (403s reported), and concurrency limits are unclear.
+  A client's phone line on a beta needs a fallback, and ours exists and works.
+- It is **lock-in**: everything lives in xAI's console. Our backend was deliberately
+  portable, and it is still the answer for a client who needs a real system integration
+  (Jobber, Housecall, Vagaro) rather than a Google Calendar.
+- The guards we learned the hard way (never hang up unless the caller signed off, connect
+  someone who asks twice, never re-read an email back) become **prompt and testing** work
+  on any no-code platform. **The list of failure modes is the asset, not the code.**
+
 ## 8b. Does a 2-minute no-code builder kill this business? No.
 Grok's Voice Agent Builder makes a working agent in about two minutes, and the whole stack
 (STT, LLM, TTS, telephony) is now off-the-shelf. That commoditises the DEMO, not the job.
