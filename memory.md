@@ -424,6 +424,15 @@ a real call, because:
   someone who asks twice, never re-read an email back) become **prompt and testing** work
   on any no-code platform. **The list of failure modes is the asset, not the code.**
 
+**The build pack is written: `grok/` at the repo root** — `agent-instructions.md` (paste
+into the instructions field; carries all eight hard-won rules), `knowledge.md` (our 38-entry
+FAQ, exported from `business.config.json` so it cannot drift), `first-message.txt`, and
+`README.md` (build steps plus a **10-row acceptance test**). Rows 4, 7, 8 and 9 — no email
+read-back, connect on the second ask, never hang up on a question, a proper goodbye — are
+the ones that cost us real calls on the old stack and are the likeliest to fail on a new one.
+**Blocked on four things only a human can do:** beta access to the Builder, the Google OAuth
+click-through for the calendar, buying/attaching the number, and making the test call.
+
 ## 8b. Does a 2-minute no-code builder kill this business? No.
 Grok's Voice Agent Builder makes a working agent in about two minutes, and the whole stack
 (STT, LLM, TTS, telephony) is now off-the-shelf. That commoditises the DEMO, not the job.
