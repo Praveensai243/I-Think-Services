@@ -275,6 +275,28 @@ product. It is not the number to publish: before giving it to prospects, buy a l
 swapping it is a dropdown change, so nothing is stranded by testing on the free one.
 
 ## 6. Decisions made
+- **⚠️ OPEN DECISION (2026-08-21): speech-to-speech, not Retell, is the real upgrade path.**
+  The **Grok Voice Agent API** (xAI) is live: speech-to-speech, **<1s time-to-first-audio**,
+  ~**$0.05/min with voices included** (comparable to Vapi + ElevenLabs), 80+ voices,
+  tool calling, OpenAI-Realtime-compatible, telephony via LiveKit numbers or Twilio SIP.
+  There is also a no-code **Voice Agent Builder** (beta, July 2026).
+  **Why it matters:** our silence problem is structural — we run
+  transcribe → think → speak in sequence, so the caller waits through the thinking.
+  Speech-to-speech removes that sequence; the model talks as it thinks. No amount of
+  tuning on the current pipeline gets to that.
+  **What we would keep:** the whole backend that earns the money — `tools.ts`, calendar,
+  notify/emails, the per-client config template. A realtime model calls those over ordinary
+  function calling.
+  **What we would lose / re-do:** the guards that live in our turn loop (never hang up
+  unless the caller signed off, force a transfer after two asks, the empty-turn fallback,
+  the turn deadline) — they would have to be re-expressed. LiveKit's plugin is Python-first
+  and we are TypeScript, though the OpenAI-Realtime compatibility gives a direct websocket
+  route.
+  **The trap to avoid:** none of the bugs that cost us this week — the 10-turn booking, the
+  email read-back loop, the missing goodbye — were Vapi's fault or Claude's. A new platform
+  fixes the PAUSES, not the FLOW, and re-platforming mid-frustration is how two weeks
+  disappear. **Evaluate before migrating:** 30 minutes in the Voice Agent Builder with our
+  own FAQ, and judge it by making a call.
 - **Voice platform: start on Vapi** (already integrated + deployed + working). **Retell is
   the upgrade path** (more reliable ~99.9% vs ~99.5%, lower out-of-box latency, managed);
   switching later ≈ a URL change because our backend is a portable custom-LLM. **Bland** only
