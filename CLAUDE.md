@@ -9,5 +9,7 @@ Two standing rules (full detail in `memory.md`):
   before implementing; push back honestly; stay decisive.
 - **Do not run anything in the background.**
 
-Quick map: static marketing site at repo root (hosted on Cloudflare); the AI-receptionist
-backend is in `agent/` (hosted on Render). Everything else is in `memory.md`.
+Quick map: static marketing site at repo root (hosted on Cloudflare); **the live product is
+a Grok voice agent — its instructions and knowledge live in `grok/`, and client delivery is
+`ONBOARDING.md`.** `agent/` is our own Node backend, kept as the fallback and for clients
+needing a real system integration. Everything else is in `memory.md`.
