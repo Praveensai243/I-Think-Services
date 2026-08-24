@@ -433,6 +433,24 @@ the ones that cost us real calls on the old stack and are the likeliest to fail 
 **Blocked on four things only a human can do:** beta access to the Builder, the Google OAuth
 click-through for the calendar, buying/attaching the number, and making the test call.
 
+**VERDICT (2026-08-24), after costing both properly: build the demo on Grok, keep Vapi as
+the fallback.** The cost comparison is not close, and it is the opposite of what §8 assumed:
+- **Vapi's $0.05/min is the ORCHESTRATION ONLY.** On top of it we pay separately for
+  speech-to-text (~$0.01), the model (~$0.02–0.20), text-to-speech (~$0.04) and telephony
+  (~$0.01). Realistic all-in is **$0.07–0.25/min**, past $0.30 with premium voices.
+- **Grok's $0.05/min includes the voices**, plus ~$0.01/min telephony on their number — call
+  it **~$0.06/min all-in**, and **no $7/mo Render per client**.
+- At 500 minutes a month that is roughly **$30 vs $50–75 plus $9 of fixed cost**. On a
+  $199/mo plan that is the difference between ~85% and ~65% gross margin, per client.
+Grok also ships the things an agency needs: knowledge collections shared across agents
+(a template, exactly our model), agent-to-agent transfer, guardrails, observability, and
+Google/Outlook Calendar + confirmation connectors — the product we are selling.
+**Against it:** beta, gated access, unclear concurrency, no documented white-label, and
+total lock-in. **So: pilots and demos on Grok, and do not put a paying client's only phone
+line on a beta until it has run clean for a few weeks.** Vapi has no native white-label
+either (Organizations separate clients; Vapify is a third-party wrapper if that is ever
+needed).
+
 ## 8b. Does a 2-minute no-code builder kill this business? No.
 Grok's Voice Agent Builder makes a working agent in about two minutes, and the whole stack
 (STT, LLM, TTS, telephony) is now off-the-shelf. That commoditises the DEMO, not the job.
