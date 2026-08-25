@@ -112,10 +112,18 @@ a client whose bookings live in Jobber, Housecall or Vagaro rather than Google C
 agent round can only reach what the agent is actually connected to, so the real protections
 are the ones below. The rules in `agent-instructions.md` are the second line, not the first.
 
-1. **Disconnect Gmail / any email connector.** The demo does not send email — it books with
-   the caller's number from caller ID. A voice agent with inbox access, reachable by anyone
-   who dials a phone number, is a data-leak waiting to happen. If email is ever needed
-   again, connect a send-only account that has no inbox worth reading.
+1. **Disconnect Gmail / any email connector — you do not need it to send a confirmation.**
+   Google Calendar emails the invite itself when the caller is added to the event as an
+   attendee. That is already the confirmation, with the meeting link on it, and it needs no
+   inbox access at all. The Gmail connector is the one that can be talked into reading your
+   mail to a stranger, and it buys nothing here.
+   - **Want the caller to get an invite?** Take their email and add them as an attendee.
+     Calendar does the rest.
+   - **Don't want to take an email by ear?** Then don't — book with the number from caller
+     ID and ring them. That is the demo default, and it is why the demo needs no email
+     connector.
+   - **Genuinely need to send free-form mail later?** Connect a **separate, empty** account
+     for sending. Never the account whose inbox matters.
 2. **Do not connect a personal or main calendar. Make a dedicated one** — "Charlotte
    Bookings" — share it with whoever needs to see it, and connect only that. Then the worst
    case is a mess in a calendar that exists for this, rather than exposure of a real diary.
