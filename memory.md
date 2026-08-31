@@ -334,11 +334,48 @@ is not.
    open by identifying itself as an AI and naming the business, offer an opt-out, and only
    call 8am–9pm local. **That is a second, separate instruction set.**
 
-**The legal shape of it (not legal advice — get an attorney to review `legal.html` §3):** an
-AI voice is an "artificial voice" under the TCPA, so a marketing call to a mobile needs
-prior express written consent. Statutory damages are $500–$1,500 **per call**. A web form CAN
-be that consent, which is exactly why the form was built this way — but "B2B" is not a safe
-harbour, because most local-business owners answer on a mobile.
+**⛔ GROK CANNOT MAKE OUTBOUND CALLS — confirmed by the user, 2026-08-31.** So the callback
+cannot be built on the platform the inbound agent runs on. **The recommendation is Vapi**,
+which does outbound and which `agent/` is already integrated with: un-suspend it for
+OUTBOUND ONLY and leave inbound on Grok. Do not re-platform inbound to get outbound.
+
+**THE OUTBOUND COMPLIANCE CHECKLIST — verified against the FCC rules on 2026-08-31, not
+recalled.** Every line is a rule, not a preference. An outbound agent that misses any of
+them is a liability, and this is the list to build the instructions from:
+1. **Say the registered legal name — "I Think Services LLC" — at the very START of the
+   call**, plus that it is an automated/AI voice. 47 CFR 64.1200(b)(1). Note this DIRECTLY
+   CONTRADICTS the inbound instruction "never say you are an AI or a bot", which is why the
+   outbound agent must be a SEPARATE instruction set and never a copy.
+2. **Give a callback number during or after the call** — (980) 372-6613. 64.1200(b)(2).
+3. **Announce an automated opt-out at the outset and keep it available all call** — voice or
+   keypress activated; it must add the number to the do-not-call list and end the call.
+   64.1200(b)(3).
+4. **Honour an opt-out made by ANY reasonable method, within 10 business days** (the rules
+   effective April 2025). Do not require magic words or a particular channel.
+5. **Call only 8am–9pm in the CALLED PARTY'S local time** — their timezone, not ours.
+6. **Scrub against the National DNC Registry and our own internal list.**
+7. **Only call a number whose consent record exists**, and keep that record.
+
+**Facts that decide the design (verified, with the trap each one closes):**
+- **An AI voice IS an "artificial voice" under the TCPA** — FCC Declaratory Ruling, 8 Feb
+  2024. It is not a grey area and not a new-technology loophole. Telemarketing to a mobile
+  therefore needs **prior express written consent**.
+- **"B2B" IS NOT A SAFE HARBOUR.** The landline carve-out does not reach mobiles, and there
+  is no B2B exemption for calls to a wireless number. **Local-business owners answer on
+  mobiles**, so assume every number on our list is a cell.
+- **A web checkbox IS a valid signature** for that consent (E-SIGN), but only when it is
+  **unticked by default and tied to an unambiguous disclosure** — never pre-ticked, never
+  buried in the terms. That is exactly why the form has two boxes and why box 2 must stay
+  optional.
+- **The one-to-one consent rule is DEAD** — vacated by the Eleventh Circuit in *Insurance
+  Marketing Coalition v. FCC*, 24 Jan 2025. Do not build for it. Our single-seller consent
+  was never affected by it anyway.
+- **Damages are $500 per call, trebled to $1,500 for a willful violation.** Per call. A
+  bad list of 50 is a five-figure problem.
+- **`legal.html` §3 was corrected on 2026-08-31** after checking the actual rules: the first
+  draft missed the registered-name-at-the-start requirement, the callback number, the
+  automated opt-out mechanism, and the ten-business-day backstop. **Written in-house and
+  still needs an attorney licensed in NC to review it before the calling is switched on.**
 
 **⏳ THE ONE THING STILL OUTSTANDING BEFORE A STRANGER RINGS IT: the 10-row acceptance test
 in `grok/README.md` has not been re-run since the guardrail edits (#56/#57) went in.** The
