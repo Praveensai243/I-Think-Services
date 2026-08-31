@@ -1,0 +1,49 @@
+{
+  "skill_name": "consent-compliance",
+  "evals": [
+    {
+      "id": 0,
+      "name": "audit-form-with-planted-defects",
+      "prompt": "Here's the signup form for my landscaping business (signup.html). Can you check it over before I put it live? We're going to start texting people about seasonal offers.",
+      "expected_output": "Identifies the pre-ticked box, the required marketing consent, and the bundling of terms with marketing permission as blocking/serious. Gives replacement HTML. Flags that it is not legal advice without drowning the findings.",
+      "files": ["signup.html"],
+      "assertions": [
+        {"text": "Flags the pre-ticked consent checkbox as a blocking defect"},
+        {"text": "Flags that marketing consent is required to submit"},
+        {"text": "Flags terms acceptance bundled with marketing consent"},
+        {"text": "Provides literal replacement text or HTML, not just a description of the problem"},
+        {"text": "States it is not legal advice"},
+        {"text": "Names specific items for a lawyer rather than only a blanket disclaimer"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "outbound-ai-calling-b2b-assumption",
+      "prompt": "We want our AI voice agent to call small businesses in our city from a list we bought, to pitch our service. It's all B2B so TCPA doesn't apply, right? Just need to know what to put on the website form.",
+      "expected_output": "Corrects the B2B misconception (no exemption for mobile numbers; small business owners answer on mobiles). Explains a bought list carries no consent. Covers artificial-voice call requirements. Recommends counsel before launch.",
+      "files": [],
+      "assertions": [
+        {"text": "Corrects the claim that B2B is exempt from the TCPA"},
+        {"text": "Explains that a purchased list carries no prior express written consent"},
+        {"text": "States that an AI voice counts as an artificial voice"},
+        {"text": "Mentions per-call statutory damages"},
+        {"text": "Covers the outbound call disclosure requirements (identity at the start, opt-out)"},
+        {"text": "Recommends a lawyer before running the campaign"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "draft-privacy-retention-and-sharing",
+      "prompt": "I run a small dental practice and we just started using an AI phone assistant that books appointments and records calls. I need a privacy policy section covering what we keep and who we share it with. We use Google Calendar, Mailchimp, and the AI vendor.",
+      "expected_output": "Produces a drafted section with a retention table using concrete periods and a vendor table including the AI vendor. Flags health data as a regulated category needing counsel (HIPAA). Notes call recording consent.",
+      "files": [],
+      "assertions": [
+        {"text": "Produces drafted policy text, not just advice about what to include"},
+        {"text": "States concrete retention periods rather than 'as long as necessary'"},
+        {"text": "Lists the AI vendor as a recipient of personal data"},
+        {"text": "Flags health data as a regulated category requiring specialist review"},
+        {"text": "Addresses consent for call recording or transcription"}
+      ]
+    }
+  ]
+}
