@@ -79,7 +79,12 @@ The product: an AI receptionist that answers calls 24/7, handles many calls at o
 reschedules/cancels appointments, answers customer questions, takes messages, and transfers
 to a human when needed.
 
-- Location: Charlotte, NC · Email: contact@ithinkservices.net · Phone: 704-387-9775
+- Location: Charlotte, NC · Email: contact@ithinkservices.net
+- **Two numbers, and the difference matters.** **(980) 372-6613** is the Charlotte
+  number the AI receptionist answers — it is what the website publishes, so the front
+  door is the product demoing itself. **(704) 387-9775** is the human line and the
+  agent's transfer destination; it stays off the website and must stay answerable.
+  **Never make them the same number** — a call cannot be transferred to its own line.
 - Tagline: "We Think, We Plan, We Serve." · Repo: `Praveensai243/I-Think-Services`
 
 ## 2. Architecture (two parts)
@@ -280,10 +285,14 @@ Google Calendar ✅ (service account, live). **Vapi ✅ (assistant + number live
 calls).** SMTP ✅ (message alerts + booking confirmations). ElevenLabs / Twilio / Stripe /
 Cal.com: later.
 
-**The number is a free Vapi test number and is inbound-only.** Fine — inbound *is* the
-product. It is not the number to publish: before giving it to prospects, buy a local
-**Charlotte, NC** number (~$2/mo) and reassign the assistant. A number is a pointer;
-swapping it is a dropdown change, so nothing is stranded by testing on the free one.
+**The Charlotte number is bought and published: (980) 372-6613 ✅ (2026-08-31).** It
+answers on the Grok agent, and all four site pages now link to it instead of the human
+line. Inbound only — which is fine, inbound *is* the product. The old free Vapi test number
+is retired as a publishable number; a number is a pointer, so nothing was stranded by
+testing on it.
+**Anyone can now reach the agent from the website**, so the console guardrails in
+`grok/README.md` are no longer optional: Gmail connector off, a dedicated bookings
+calendar, web search off, nothing else connected.
 
 ## 6. Decisions made
 - **⚠️ OPEN DECISION (2026-08-21): speech-to-speech, not Retell, is the real upgrade path.**
