@@ -488,6 +488,46 @@ section{padding:clamp(64px,9vw,108px) 0;position:relative}
 .contact-side a.line:hover{color:var(--flow)}
 .note{font-size:.82rem;color:var(--muted);margin-top:10px}
 
+/* ---- interest form: service picker + consent ---- */
+.fieldset{border:0;padding:0;margin:0 0 18px}
+.fieldset legend{font-size:.82rem;color:var(--muted);font-family:var(--f-mono);letter-spacing:.06em;
+  text-transform:uppercase;padding:0;margin-bottom:10px}
+.svc-group{margin-bottom:18px}
+.svc-group h4{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);margin:0 0 10px}
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.svc-grid{grid-template-columns:1fr}}
+.check{display:flex;gap:11px;align-items:flex-start;background:var(--bg-2);border:1px solid var(--line-2);
+  border-radius:11px;padding:11px 13px;cursor:pointer;transition:border-color var(--t),background var(--t)}
+.check:hover{border-color:var(--line-3)}
+.check:has(input:checked){border-color:var(--flow);background:rgba(34,232,182,.06)}
+.check:has(input:focus-visible){box-shadow:0 0 0 3px rgba(34,232,182,.12)}
+.check input{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:18px;height:18px;margin:1px 0 0;
+  border:1px solid var(--line-3);border-radius:5px;background:var(--surface);cursor:pointer;
+  transition:border-color var(--t),background var(--t)}
+.check input:checked{background:var(--flow);border-color:var(--flow)}
+.check input:checked::after{content:"";display:block;width:5px;height:9px;margin:1px 0 0 5px;
+  border:solid #05070E;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.check span{font-size:.92rem;color:var(--text);line-height:1.45}
+.consent{display:grid;gap:12px;margin:22px 0 18px;padding:18px;background:var(--bg-2);
+  border:1px solid var(--line-2);border-radius:14px}
+.consent .check{background:transparent;border:0;padding:0}
+.consent .check:hover{border:0}
+.consent .check:has(input:checked){background:transparent}
+.consent .check span{font-size:.86rem;color:var(--muted);line-height:1.6}
+.consent .check span b{color:var(--text);font-weight:600}
+.consent a{color:var(--flow);text-decoration:underline;text-underline-offset:2px}
+.consent .fine{font-size:.78rem;color:var(--dim);line-height:1.6;margin:0}
+.req{color:var(--live)}
+
+/* ---- legal page ---- */
+.legal{max-width:76ch}
+.legal h2{margin:42px 0 14px}
+.legal h3{margin:26px 0 10px;font-size:1.05rem}
+.legal p,.legal li{color:var(--muted);line-height:1.75}
+.legal ul{margin:12px 0 12px 20px;display:grid;gap:8px}
+.legal .updated{font-family:var(--f-mono);font-size:.78rem;color:var(--dim);letter-spacing:.04em}
+
 /* ---------------------------------------------------------------- footer */
 footer{border-top:1px solid var(--line);padding:64px 0 40px;margin-top:60px;position:relative;z-index:1}
 .foot-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:40px;margin-bottom:46px}

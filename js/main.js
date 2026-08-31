@@ -363,16 +363,55 @@
   (function(){
     var f = $("#contact-form"); if(!f) return;
     var s = $("#form-status"), btn = f.querySelector('button[type="submit"]');
-    var label = btn ? btn.innerHTML : "Send message";
+    var label = btn ? btn.innerHTML : "Send enquiry";
     function show(msg,color){ if(!s) return; s.style.display="block"; s.style.color=color; s.textContent=msg; }
+
+    /* The exact wording someone agreed to is the record that matters if a call is
+       ever questioned, so store the text itself — not just a "yes" — alongside the
+       moment they ticked it and the page they were on. */
+    function consentRecord(){
+      var box = f.querySelector("#agree_calls");
+      var wrap = box ? box.closest(".check") : null;
+      if(!box || !box.checked) return "DECLINED automated calls — email follow-up only";
+      return "AGREED: " + (wrap ? wrap.textContent.replace(/\s+/g," ").trim() : "automated call consent");
+    }
+
     f.addEventListener("submit", function(e){
       e.preventDefault();
+
+      var picked = f.querySelectorAll('input[name="services"]:checked');
+      if(!picked.length){
+        show("Please pick at least one service you're interested in.","var(--live)");
+        var first = f.querySelector('input[name="services"]');
+        if(first) first.focus();
+        return;
+      }
+
+      var rec = $("#consent_text"), at = $("#consent_at"), pg = $("#consent_page");
+      if(rec) rec.value = consentRecord();
+      if(at)  at.value  = new Date().toISOString();
+      if(pg)  pg.value  = location.href;
+
+      /* One readable line in the email beats seventeen repeated fields. */
+      var list = [];
+      for(var i=0;i<picked.length;i++) list.push(picked[i].value);
+      var data = new FormData(f);
+      data.delete("services");
+      data.append("services", list.join(", "));
+
       if(btn){ btn.disabled=true; btn.innerHTML="Sending…"; }
-      show("Transmitting your message…","var(--muted)");
-      fetch("https://api.web3forms.com/submit",{method:"POST",headers:{Accept:"application/json"},body:new FormData(f)})
+      show("Transmitting your enquiry…","var(--muted)");
+      fetch("https://api.web3forms.com/submit",{method:"POST",headers:{Accept:"application/json"},body:data})
         .then(function(r){ return r.json(); })
-        .then(function(d){ if(d.success){ show("Thanks — your message is in. We'll reply within one business day.","var(--flow)"); f.reset(); } else { throw new Error(d.message||"failed"); } })
-        .catch(function(){ show("Couldn't send just now. Please email info@ithinkservices.net.","var(--live)"); })
+        .then(function(d){
+          if(!d.success) throw new Error(d.message||"failed");
+          var called = f.querySelector("#agree_calls");
+          show(called && called.checked
+            ? "Thanks — your enquiry is in. Expect a call shortly to book your demo."
+            : "Thanks — your enquiry is in. We'll reply by email within one business day.","var(--flow)");
+          f.reset();
+        })
+        .catch(function(){ show("Couldn't send just now. Please email contact@ithinkservices.net or call (980) 372-6613.","var(--live)"); })
         .finally(function(){ if(btn){ btn.disabled=false; btn.innerHTML=label; } });
     });
   })();
