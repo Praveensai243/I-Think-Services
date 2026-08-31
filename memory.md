@@ -293,7 +293,18 @@ testing on it.
 **Anyone can now reach the agent from the website**, so the console guardrails in
 `grok/README.md` are no longer optional: Gmail connector off, a dedicated bookings
 calendar, web search off, nothing else connected.
+**Console confirmed by the user, 2026-08-31 ✅:** the agent answers on (980) 372-6613, the
+transfer destination is still (704) 387-9775, and all three guardrails are set — Gmail
+connector off, dedicated bookings calendar, web search off.
 
+**⏳ THE ONE THING STILL OUTSTANDING BEFORE A STRANGER RINGS IT: the 10-row acceptance test
+in `grok/README.md` has not been re-run since the guardrail edits (#56/#57) went in.** The
+demo passed end to end on 2026-08-24, but 24 lines of instructions have changed since that
+call, and the README's own warning is that fixing one row has broken another before. **Row
+7 — ask for a person, then ask again — has never passed on Grok at all**; the one time
+transfer came up, the agent fired the tool as if it were a lookup. On the old stack a failed
+transfer ENDED THE CALL, and that is the failure a prospect would see. Ask for the result of
+that test before assuming the demo is safe to hand out.
 ## 6. Decisions made
 - **⚠️ OPEN DECISION (2026-08-21): speech-to-speech, not Retell, is the real upgrade path.**
   The **Grok Voice Agent API** (xAI) is live: speech-to-speech, **<1s time-to-first-audio**,
